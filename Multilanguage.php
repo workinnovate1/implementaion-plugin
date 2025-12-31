@@ -1,0 +1,52 @@
+<?php
+/*
+ * Plugin Name: AI Multi-language Translation
+ * Description: Multilanguage Plugin for Implementation
+ * Requires at least: 5.2
+ * Requires PHP: 7.2
+ * Author: Workinnovate
+ * Author URI: https://Workinnovate.com/
+ * License: GPLv2 or later
+ * Text-domain: mutlilang-implementation
+ */
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-aimt-admin.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-aimt-activator.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-aimt-translations.php';
+
+class MultilanguagePlugin
+{
+    public function activate() {
+        AIMT_Activator::activate();
+    }
+
+    public function deactivate() {
+    }
+
+    public static function uninstall() {
+    }
+}
+
+
+if (class_exists('MultilanguagePlugin')) {
+    $multilanguagePlugin = new MultilanguagePlugin();
+}
+
+
+// Activation
+register_activation_hook(__FILE__, array($multilanguagePlugin, 'activate'));
+
+if ( is_admin() ) {
+    new AIMT_Admin();
+}
+
+new AIMT_Translations();
+
+// Deactivation
+register_deactivation_hook(__FILE__, array($multilanguagePlugin, 'deactivate'));
+
+// Uninstall
+register_uninstall_hook(__FILE__, array('MultilanguagePlugin', 'uninstall'));
