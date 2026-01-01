@@ -70,7 +70,7 @@ class AIMT_Admin {
     );
     ?>
     <div class="wrap aimt-onboarding">
-                    <h1 class="font-poppins text-center main-h">Mulitlang-implementaion</h1>
+      <h1 class="font-poppins text-center main-h">Multilang-implementaion</h1>
 
         <div class="container mt-4">
             <div class="progress mb-5">
@@ -199,7 +199,7 @@ class AIMT_Admin {
                             </div>
 
                             <div class="step-content step-url-format">
-                                <h2 class="font-poppins">How would You like to format your sit's URL?</h2>
+                                <h2 class="font-poppins">How would You like to format your site's URL?</h2>
                                 <!-- <p>Choose how language codes appear in your URLs.</p> -->
                                 
                                 <div class="url-options mt-4">
@@ -214,7 +214,7 @@ class AIMT_Admin {
                                     <div class="form-check mb-3">
                                         <input style="margin-top:8px" class="form-check-input" type="radio" name="url_format" id="format-subdomain" value="subdomain">
                                         <label style="margin-left: 24px"  class="form-check-label" for="format-subdomain">
-                                            <strong class="font-poppins" >A different doman per language</strong><br>
+                                            <strong class="font-poppins" >A different domain per language</strong><br>
                                             <small>fr.implementaion.com/about-us/</small>
                                         </label>
                                     </div>
@@ -276,10 +276,10 @@ class AIMT_Admin {
                                             <h4>Translate What You Choose</h4>
                                             <p class="text-muted">You decide what to translate and who'll translate it</p>
                                             <ul class="features-list">
-                                                <li>• Translate yourself</li>
-                                                <li>• Use automatic translation on the content you choose</li>
-                                                <li>• Work with translators that are users of your site</li>
-                                                <li>• Send to professional translation services</li>
+                                                <li>✓ Translate yourself</li>
+                                                <li>✓ Use automatic translation on the content you choose</li>
+                                                <li>✓ Work with translators that are users of your site</li>
+                                                <li>✓ Send to professional translation services</li>
                                             </ul>
                                             <button class="button btn-block choose-mode" data-mode="manual">Choose</button>
                                         </div>
@@ -298,24 +298,24 @@ class AIMT_Admin {
                                 
                                 <div class="support-options mt-4">
                                     <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="support_docs" checked>
-                                        <label class="form-check-label" for="support_docs">
+                                        <input style="margin-top:8px"   class="form-check-input" type="checkbox" id="support_docs" checked>
+                                        <label style="margin-left:24px"  class="form-check-label" for="support_docs">
                                             <strong>Documentation Access</strong><br>
                                             <small>Get access to comprehensive documentation</small>
                                         </label>
                                     </div>
                                     
                                     <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="support_forum">
-                                        <label class="form-check-label" for="support_forum">
+                                        <input style="margin-top:8px"  class="form-check-input" type="checkbox" id="support_forum">
+                                        <label style="margin-left: 24px" class="form-check-label" for="support_forum">
                                             <strong>Forum Support</strong><br>
                                             <small>Access to community support forums</small>
                                         </label>
                                     </div>
                                     
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="support_email">
-                                        <label class="form-check-label" for="support_email">
+                                        <input style="margin-top:8px"   class="form-check-input" type="checkbox" id="support_email">
+                                        <label style="margin-left: 24px"  class="form-check-label" for="support_email">
                                             <strong>Email Support</strong><br>
                                             <small>Direct email support with our team</small>
                                         </label>
@@ -334,32 +334,32 @@ class AIMT_Admin {
                                 
                                 <div class="plugins-list mt-4">
                                     <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="plugin_woocommerce" checked>
-                                        <label class="form-check-label" for="plugin_woocommerce">
+                                        <input style="margin-top:8px"   class="form-check-input" type="checkbox" id="plugin_woocommerce" checked>
+                                        <labe style="margin-left:24px"   class="form-check-label" for="plugin_woocommerce">
                                             <strong>WooCommerce Multilingual</strong><br>
                                             <small>Translate your WooCommerce products and store</small>
                                         </label>
                                     </div>
                                     
                                     <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="plugin_seo" checked>
-                                        <label class="form-check-label" for="plugin_seo">
+                                        <input style="margin-top:8px"   class="form-check-input" type="checkbox" id="plugin_seo" checked>
+                                        <label style="margin-left: 24px"  class="form-check-label" for="plugin_seo">
                                             <strong>SEO Pack</strong><br>
                                             <small>Optimize your multilingual site for search engines</small>
                                         </label>
                                     </div>
                                     
                                     <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="plugin_slug">
-                                        <label class="form-check-label" for="plugin_slug">
+                                        <input style="margin-top:8px"   class="form-check-input" type="checkbox" id="plugin_slug">
+                                        <label style="margin-left: 24px"  class="form-check-label" for="plugin_slug">
                                             <strong>Slug Translation</strong><br>
                                             <small>Translate URL slugs for better SEO</small>
                                         </label>
                                     </div>
                                     
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="plugin_media">
-                                        <label class="form-check-label" for="plugin_media">
+                                        <input style="margin-top:8px"   class="form-check-input" type="checkbox" id="plugin_media">
+                                        <label style="margin-left: 24px"  class="form-check-label" for="plugin_media">
                                             <strong>Media Translation</strong><br>
                                             <small>Translate media captions and alt texts</small>
                                         </label>
