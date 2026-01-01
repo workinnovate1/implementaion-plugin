@@ -22,5 +22,8 @@ class AIMT_Activator {
         dbDelta( $sql );
 
         add_option( 'aimt_default_languages', array( 'en', 'fr', 'de' ) );
+
+       add_option('aimt_show_onboarding', 1);
+
     }
 }

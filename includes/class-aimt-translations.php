@@ -25,7 +25,7 @@ class AIMT_Translations {
     public function render_meta_box($post) {
         $languages = get_option('aimt_default_languages', array('en', 'fr', 'de'));
         global $wpdb;
-        $table_name = $wpdb->prefix . 'aimt_translations'
+        $table_name = $wpdb->prefix . 'aimt_translations';
         ?>
         <div id="aimt-translation-modal" style="border:1px solid #ccc; padding:15px; background:#f9f9f9;">
             <h4>Translation Option</h4>
@@ -63,7 +63,7 @@ wp_nonce_field('aimt_save_translation', 'aimt_translation_nonce');
     //Har lanugage ko loop krein or transltion add or update kry 
     foreach ($_POST['aimt_translation'] as $lang => $text){
       $exists = $wpdb->get_var($wpdb->prepare(
-        "SELECT id FROM $table_name WHERE post_id=%d AND lanugage_code=%s",
+        "SELECT id FROM $table_name WHERE post_id=%d AND  language_code=%s",
         $post_id, $lang
       ));
       if($exists){

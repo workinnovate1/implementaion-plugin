@@ -23,11 +23,11 @@ class MultilanguagePlugin
         AIMT_Activator::activate();
     }
 
-    public function deactivate() {
-    }
+    // public function deactivate() {
+    // }
 
-    public static function uninstall() {
-    }
+    // public static function uninstall() {
+    // }
 }
 
 
@@ -39,6 +39,14 @@ if (class_exists('MultilanguagePlugin')) {
 // Activation
 register_activation_hook(__FILE__, array($multilanguagePlugin, 'activate'));
 
+add_action('admin_init', function () {
+    if (get_option('aimt_show_onboarding')) {
+        delete_option('aimt_show_onboarding');
+        wp_safe_redirect(admin_url('admin.php?page=aimt-onboarding'));
+        exit;
+    }
+});
+
 if ( is_admin() ) {
     new AIMT_Admin();
 }
@@ -46,7 +54,7 @@ if ( is_admin() ) {
 new AIMT_Translations();
 
 // Deactivation
-register_deactivation_hook(__FILE__, array($multilanguagePlugin, 'deactivate'));
+// register_deactivation_hook(__FILE__, array($multilanguagePlugin, 'deactivate'));
 
 // Uninstall
-register_uninstall_hook(__FILE__, array('MultilanguagePlugin', 'uninstall'));
+// register_uninstall_hook(__FILE__, array('MultilanguagePlugin', 'uninstall'));
