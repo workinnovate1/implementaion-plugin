@@ -11,19 +11,20 @@ class AIMT_Activator {
         $sql = "CREATE TABLE IF NOT EXISTS $table_name (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             post_id BIGINT(20) UNSIGNED NOT NULL,
+            post_type VARCHAR(50) NOT NULL,
             language_code VARCHAR(10) NOT NULL,
             translation_text LONGTEXT NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY post_lang (post_id, language_code)
+            UNIQUE KEY post_lang (post_id, post_type, language_code),
+            KEY post_type_idx (post_type)
         ) $charset_collate;";
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-        dbDelta( $sql );
+        dbDelta($sql);
 
-        add_option( 'aimt_default_languages', array( 'en', 'fr', 'de' ) );
-
-       add_option('aimt_show_onboarding', 1);
-
+        add_option('aimt_default_languages', array('en', 'fr', 'de'));
+        add_option('aimt_translatable_post_types', array('post', 'page'));
+        add_option('aimt_show_onboarding', 1);
     }
 }

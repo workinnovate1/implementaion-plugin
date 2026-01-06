@@ -16,6 +16,7 @@ if (!defined('ABSPATH')) {
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-aimt-admin.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-aimt-activator.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-aimt-translations.php';
+      add_action( 'init', 'register_test_post_types' );
 
 class MultilanguagePlugin
 {
@@ -34,6 +35,42 @@ class MultilanguagePlugin
 if (class_exists('MultilanguagePlugin')) {
     $multilanguagePlugin = new MultilanguagePlugin();
 }
+
+    function register_test_post_types() {
+    // Books
+    register_post_type( 'books', array(
+        'label'        => 'Books',
+        'public'       => true,
+        'show_in_menu' => true,
+        'supports'     => array( 'title', 'editor', 'thumbnail' ),
+        'has_archive'  => true,
+    ) );
+    // Shoes
+    register_post_type( 'shoes', array(
+        'label'        => 'Shoes',
+        'public'       => true,
+        'show_in_menu' => true,
+        'supports'     => array( 'title', 'editor', 'thumbnail' ),
+        'has_archive'  => true,
+    ) );
+    // Clothes
+    register_post_type( 'clothes', array(
+        'label'        => 'Clothes',
+        'public'       => true,
+        'show_in_menu' => true,
+        'supports'     => array( 'title', 'editor', 'thumbnail' ),
+        'has_archive'  => true,
+    ) );
+    register_post_type( 'Test1', array(
+        'label'        => 'Start Test',
+        'public'       => true,
+        'show_in_menu' => true,
+        'supports'     => array( 'title', 'editor', 'thumbnail' ),
+        'has_archive'  => true,
+    ) );
+
+}
+
 
 
 // Activation
