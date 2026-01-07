@@ -1,5 +1,9 @@
 jQuery(document).ready(function ($) {
-  const STORAGE_KEY = "aimt_onboarding_state_v1";
+  console.log('AIMT Onboarding Script Loaded');
+  console.log('AJAX URL:', ajaxurl);
+  console.log('Nonce:', aimtOnboardingData.nonce);
+
+  const aimtNonce = aimtOnboardingData.nonce;
 
   let state = {
     step: "languages",
@@ -49,8 +53,8 @@ jQuery(document).ready(function ($) {
     const alertHtml = `
       <div class="aimt-stored-alert alert alert-success alert-dismissible fade show" role="alert" style="margin-bottom:20px;">
         <div>
-          <strong>All data saved locally.</strong>
-          Your onboarding choices are stored in localStorage.
+          <strong>All data saved in database.</strong>
+          Your onboarding choices are stored in WordPress options.
         </div>
         ${summaryHtmlForState(state)}
         <div style="margin-top:8px;">
@@ -71,8 +75,8 @@ jQuery(document).ready(function ($) {
 
     $(document).on("click", ".aimt-view-console", function (e) {
       e.preventDefault();
-      console.log("AIMT onboarding stored state:", state);
-      alert("Stored data printed to console.");
+      console.log("AIMT onboarding database state:", state);
+      // alert("Stored data printed to console.");
     });
   }
 
@@ -80,7 +84,6 @@ jQuery(document).ready(function ($) {
     $(".aimt-stored-alert").remove();
   }
 
-  
   function isStateComplete() {
     const hasDefaultLang =
       Object.keys(state.selectedLanguages || {}).length > 0;
@@ -99,55 +102,160 @@ jQuery(document).ready(function ($) {
   }
 
   function saveState() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      console.log("AIMT onboarding saved state:", state);
-    } catch (e) {
-      console.warn("Could not save onboarding state", e);
-    }
-    handleStoredAlertDisplay();
+    console.log('Saving state to database:', state);
+    
+    $.ajax({
+      url: ajaxurl,
+      type: 'POST',
+      data: {
+        action: 'aimt_save_onboarding',
+        nonce: aimtNonce,
+        state: JSON.stringify(state)
+      },
+      success: function(response) {
+        if (response.success) {
+          console.log('✅ State saved successfully:', response.data);
+          console.log('Response:', response);
+          handleStoredAlertDisplay();
+          
+          setTimeout(function() {
+            $.ajax({
+              url: ajaxurl,
+              type: 'POST',
+              data: {
+                action: 'aimt_load_onboarding',
+                nonce: aimtNonce
+              },
+              success: function(loadResponse) {
+                if (loadResponse.success) {
+                  console.log('✅ Load test successful:', loadResponse.data);
+                }
+              }
+            });
+          }, 500);
+          
+        } else {
+          console.error('❌ Failed to save state:', response.data);
+        }
+      },
+      error: function(xhr, status, error) {
+        console.error('❌ AJAX error saving state:', error);
+        console.error('Status:', status);
+        console.error('XHR:', xhr);
+      }
+    });
   }
 
-  function loadState() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      state = $.extend(true, {}, state, parsed);
-      console.log("AIMT onboarding loaded state:", state);
-    } catch (e) {
-      console.warn("Could not load onboarding state", e);
-    }
+  function loadState(callback) {
+    console.log('Loading state from database...');
+    
+    $.ajax({
+      url: ajaxurl,
+      type: 'POST',
+      data: {
+        action: 'aimt_load_onboarding',
+        nonce: aimtNonce
+      },
+      success: function(response) {
+        console.log('Load response:', response);
+        
+        if (response.success && response.data.exists) {
+          console.log('✅ State loaded from database:', response.data.state);
+          state = $.extend(true, {}, state, response.data.state);
+          
+          renderDefaultLanguages();
+          renderTranslationLanguages();
+          syncTranslationLanguages();
+          
+          if (state.urlFormat) {
+            $(`input[name="url_format"][value="${state.urlFormat}"]`).prop("checked", true);
+          }
+          
+          if (state.wpmlKey) {
+            $("#wpml_key").val(state.wpmlKey);
+          }
+          
+          if (state.translationMode) {
+            $(".choose-mode").removeClass("active");
+            $(`.choose-mode[data-mode="${state.translationMode}"]`).addClass("active");
+          }
+          
+          Object.keys(state.support || {}).forEach(function (k) {
+            $(`#${k}`).prop("checked", !!state.support[k]);
+          });
+          
+          Object.keys(state.plugins || {}).forEach(function (k) {
+            $(`#${k}`).prop("checked", !!state.plugins[k]);
+          });
+          
+          navigateToStep(state.step);
+          
+          if (callback) callback();
+        } else {
+          console.log('ℹ️ No saved state found in database');
+          if (callback) callback();
+        }
+      },
+      error: function(xhr, status, error) {
+        console.error('❌ AJAX error loading state:', error);
+        console.error('Status:', status);
+        console.error('XHR:', xhr);
+        if (callback) callback();
+      }
+    });
   }
 
   function clearState() {
-    localStorage.removeItem(STORAGE_KEY);
-    state = {
-      step: "languages",
-      selectedLanguages: { en: "English" },
-      translationLanguages: {},
-      postType: "",
-      urlFormat: "subdirectory",
-      wpmlKey: "",
-      translationMode: "",
-      support: {
-        support_docs: true,
-        support_forum: false,
-        support_email: false,
+    $.ajax({
+      url: ajaxurl,
+      type: 'POST',
+      data: {
+        action: 'aimt_clear_onboarding',
+        nonce: aimtNonce
       },
-      plugins: {
-        plugin_woocommerce: true,
-        plugin_seo: true,
-        plugin_slug: false,
-        plugin_media: false,
+      success: function(response) {
+        if (response.success) {
+          state = {
+            step: "languages",
+            selectedLanguages: { en: "English" },
+            translationLanguages: {},
+            postType: "",
+            urlFormat: "subdirectory",
+            wpmlKey: "",
+            translationMode: "",
+            support: {
+              support_docs: true,
+              support_forum: false,
+              support_email: false,
+            },
+            plugins: {
+              plugin_woocommerce: true,
+              plugin_seo: true,
+              plugin_slug: false,
+              plugin_media: false,
+            },
+          };
+          
+          renderDefaultLanguages();
+          renderTranslationLanguages();
+          syncTranslationLanguages();
+          navigateToStep("languages");
+          hideStoredAlert();
+          
+          console.log('✅ State cleared from database');
+        }
       },
-    };
-    saveState();
+      error: function(xhr, status, error) {
+        console.error('❌ AJAX error clearing state:', error);
+        console.error('Status:', status);
+        console.error('XHR:', xhr);
+      }
+    });
   }
 
   function handleStoredAlertDisplay() {
     if (state.step === "finished" && isStateComplete()) {
-      hideStoredAlert(); 
+      hideStoredAlert();
       showStoredAlert();
     } else {
       hideStoredAlert();
@@ -203,16 +311,6 @@ jQuery(document).ready(function ($) {
     renderTranslationLanguages();
   }
 
-  
-  loadState();
-
-  
-  renderDefaultLanguages();
-  renderTranslationLanguages();
-  syncTranslationLanguages();
-
-  handleStoredAlertDisplay();
-
   function navigateToStep(step) {
     state.step = step || "languages";
     $(".step-content").removeClass("active");
@@ -244,9 +342,9 @@ jQuery(document).ready(function ($) {
     });
   }
 
- 
-  navigateToStep(state.step);
-
+  loadState(function() {
+    handleStoredAlertDisplay();
+  });
 
   $(document).on("click", ".language-option", function (e) {
     e.preventDefault();
@@ -360,29 +458,50 @@ jQuery(document).ready(function ($) {
     navigateToStep(prev);
   });
 
-  if (state.urlFormat) {
-    $(`input[name="url_format"][value="${state.urlFormat}"]`).prop(
-      "checked",
-      true
-    );
-  }
+  $('<button class="button button-secondary" id="aimt-clear-state" style="margin-left:10px;">Clear All Data</button>')
+    .insertAfter('.step-finished .button-primary')
+    .on('click', function(e) {
+      e.preventDefault();
+      if (confirm('Are you sure you want to clear all onboarding data?')) {
+        clearState();
+      }
+    });
 
-  if (state.wpmlKey) {
-    $("#wpml_key").val(state.wpmlKey);
-  }
-
-  if (state.translationMode) {
-    $(".choose-mode").removeClass("active");
-    $(`.choose-mode[data-mode="${state.translationMode}"]`).addClass("active");
-  }
-
-  Object.keys(state.support).forEach(function (k) {
-    $(`#${k}`).prop("checked", !!state.support[k]);
-  });
-
-  Object.keys(state.plugins).forEach(function (k) {
-    $(`#${k}`).prop("checked", !!state.plugins[k]);
-  });
-
-  updateProgressBar(getStepIndex(state.step));
+  window.testOnboardingStorage = function() {
+    console.clear();
+    console.log('=== AIMT Onboarding Storage Test ===');
+    
+    $.ajax({
+        url: ajaxurl,
+        type: 'POST',
+        data: {
+            action: 'aimt_save_onboarding',
+            nonce: aimtNonce,
+            state: JSON.stringify({test: 'test_data', timestamp: new Date().toISOString()})
+        },
+        success: function(response) {
+            console.log('✅ Save test response:', response);
+            
+            setTimeout(function() {
+                console.log('\n✅ Loading test data...');
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'aimt_load_onboarding',
+                        nonce: aimtNonce
+                    },
+                    success: function(loadResponse) {
+                        console.log('✅ Load test response:', loadResponse);
+                        alert('✅ Test completed! Check console for details.');
+                    }
+                });
+            }, 1000);
+        },
+        error: function(xhr, status, error) {
+            console.error('❌ Test failed:', error);
+            alert('❌ Test failed! Check console for errors.');
+        }
+    });
+  };
 });

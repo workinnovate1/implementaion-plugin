@@ -6,7 +6,9 @@ class AIMT_Admin {
         add_action('admin_enqueue_scripts', array($this, 'assets'));
         add_action('save_post', array($this, 'aimt_show_alert_on_post_save'), 10, 3);
         add_action('wp_ajax_aimt_clear_alert_flag', array($this, 'aimt_clear_alert_flag'));
-  
+        add_action('wp_ajax_aimt_save_onboarding', array($this, 'save_onboarding_state'));
+        add_action('wp_ajax_aimt_load_onboarding', array($this, 'load_onboarding_state'));
+        add_action('wp_ajax_aimt_clear_onboarding', array($this, 'clear_onboarding_state'));
     }
 
     public function aimt_show_alert_on_post_save($post_id, $post, $update) {
@@ -28,26 +30,197 @@ class AIMT_Admin {
         wp_send_json_success();
     }
 
+    public function save_onboarding_state() {
+        check_ajax_referer('aimt_onboarding_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Unauthorized');
+        }
 
-    public function register_menu(){
-        add_menu_page(
-            'AI Multi-Language',
-            'AI Multi-Language',
-            'manage_options',
-            'aimt-settings',
-            array($this, 'settings_page'),
-            'dashicons-translation',
-            80
-        );
-        add_submenu_page(
-            'aimt-settings',
-            'Onboarding',
-            'Onboarding',
-            'manage_options',
-            'aimt-onboarding',
-            array($this, 'onboarding_page')
-        );
+        $state = isset($_POST['state']) ? json_decode(stripslashes($_POST['state']), true) : null;
+        
+        if ($state) {
+            $sanitized_state = $this->sanitize_onboarding_state($state);
+            
+            update_option('aimt_onboarding_state', $sanitized_state, false);
+            
+            $this->save_individual_options($sanitized_state);
+            
+            wp_send_json_success(array(
+                'message' => 'State saved successfully',
+                'state' => $sanitized_state
+            ));
+        } else {
+            wp_send_json_error('Invalid state data');
+        }
     }
+
+    public function load_onboarding_state() {
+        check_ajax_referer('aimt_onboarding_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Unauthorized');
+        }
+
+        $state = get_option('aimt_onboarding_state', array());
+        
+        wp_send_json_success(array(
+            'state' => $state,
+            'exists' => !empty($state)
+        ));
+    }
+
+    public function clear_onboarding_state() {
+        check_ajax_referer('aimt_onboarding_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Unauthorized');
+        }
+
+        delete_option('aimt_onboarding_state');
+        
+        $this->clear_individual_options();
+        
+        wp_send_json_success('State cleared successfully');
+    }
+
+    private function sanitize_onboarding_state($state) {
+        $sanitized = array();
+        
+        $sanitized['step'] = sanitize_text_field($state['step'] ?? 'languages');
+        
+        $sanitized['selectedLanguages'] = array();
+        if (isset($state['selectedLanguages']) && is_array($state['selectedLanguages'])) {
+            foreach ($state['selectedLanguages'] as $code => $name) {
+                $clean_code = sanitize_text_field($code);
+                $clean_name = sanitize_text_field($name);
+                if ($clean_code && $clean_name) {
+                    $sanitized['selectedLanguages'][$clean_code] = $clean_name;
+                }
+            }
+        }
+        
+        $sanitized['translationLanguages'] = array();
+        if (isset($state['translationLanguages']) && is_array($state['translationLanguages'])) {
+            foreach ($state['translationLanguages'] as $code => $name) {
+                $clean_code = sanitize_text_field($code);
+                $clean_name = sanitize_text_field($name);
+                if ($clean_code && $clean_name) {
+                    $sanitized['translationLanguages'][$clean_code] = $clean_name;
+                }
+            }
+        }
+        
+        $sanitized['postType'] = sanitize_text_field($state['postType'] ?? '');
+        // $sanitized['urlFormat'] = sanitize_text_field($state['urlFormat'] ?? 'subdirectory');
+        $sanitized['wpmlKey'] = sanitize_text_field($state['wpmlKey'] ?? '');
+        $sanitized['translationMode'] = sanitize_text_field($state['translationMode'] ?? '');
+        
+        // $sanitized['support'] = array(
+        //     'support_docs' => !empty($state['support']['support_docs']),
+        //     'support_forum' => !empty($state['support']['support_forum']),
+        //     'support_email' => !empty($state['support']['support_email'])
+        // );
+        
+        $sanitized['plugins'] = array(
+            'plugin_woocommerce' => !empty($state['plugins']['plugin_woocommerce']),
+            'plugin_seo' => !empty($state['plugins']['plugin_seo']),
+            'plugin_slug' => !empty($state['plugins']['plugin_slug']),
+            'plugin_media' => !empty($state['plugins']['plugin_media'])
+        );
+        
+        return $sanitized;
+    }
+
+    private function save_individual_options($state) {
+        if (!empty($state['selectedLanguages'])) {
+            update_option('aimt_default_languages', array_keys($state['selectedLanguages']));
+        }
+        
+        if (!empty($state['translationLanguages'])) {
+            update_option('aimt_translation_languages', array_keys($state['translationLanguages']));
+        }
+        
+        if (!empty($state['postType'])) {
+            update_option('aimt_selected_post_type', $state['postType']);
+        }
+        
+        // update_option('aimt_url_format', $state['urlFormat']);
+        update_option('aimt_translation_mode', $state['translationMode']);
+        
+        if (!empty($state['wpmlKey'])) {
+            update_option('aimt_wpml_key', $state['wpmlKey']);
+        }
+        
+        // update_option('aimt_support_options', $state['support']);
+        update_option('aimt_plugin_options', $state['plugins']);
+    }
+
+    private function clear_individual_options() {
+        delete_option('aimt_default_languages');
+        delete_option('aimt_translation_languages');
+        delete_option('aimt_selected_post_type');
+        // delete_option('aimt_url_format');
+        delete_option('aimt_translation_mode');
+        delete_option('aimt_wpml_key');
+        // delete_option('aimt_support_options');
+        delete_option('aimt_plugin_options');
+    }
+
+    public function get_onboarding_config() {
+        $state = get_option('aimt_onboarding_state', array());
+        
+        if (empty($state)) {
+            $state = array(
+                'selectedLanguages' => array_flip(get_option('aimt_default_languages', array('en'))),
+                'translationLanguages' => array_flip(get_option('aimt_translation_languages', array())),
+                'postType' => get_option('aimt_selected_post_type', ''),
+                // 'urlFormat' => get_option('aimt_url_format', 'subdirectory'),
+                'translationMode' => get_option('aimt_translation_mode', ''),
+                'wpmlKey' => get_option('aimt_wpml_key', ''),
+                'support' => get_option('aimt_support_options', array()),
+                'plugins' => get_option('aimt_plugin_options', array())
+            );
+        }
+        
+        return $state;
+    }
+
+    public function is_onboarding_complete() {
+        $state = $this->get_onboarding_config();
+        return !empty($state['selectedLanguages']) && 
+               !empty($state['translationLanguages']) && 
+               !empty($state['postType']) &&
+               !empty($state['translationMode']);
+    }
+
+   public function register_menu(){
+    add_menu_page(
+        'AI Multi-Language',
+        'AI Multi-Language',
+        'manage_options',
+        'aimt-settings',
+        array($this, 'settings_page'),
+        'dashicons-translation',
+        80
+    );
+    add_submenu_page(
+        'aimt-settings',
+        'Onboarding',
+        'Onboarding',
+        'manage_options',
+        'aimt-onboarding',
+        array($this, 'onboarding_page')
+    );
+    add_submenu_page(
+        null, // Hide from menu
+        'Debug Onboarding',
+        'Debug Onboarding',
+        'manage_options',
+        'aimt-debug-onboarding',
+        array($this, 'debug_onboarding_state')
+    );
+}
     
 
     public function assets($hook) {
@@ -79,6 +252,11 @@ class AIMT_Admin {
                 '1.0',
                 true
             );
+
+            wp_localize_script('aimt-onboarding-js', 'aimtOnboardingData', [
+                'ajaxurl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('aimt_onboarding_nonce')
+            ]);
         }
 
         if (in_array($hook, ['post.php', 'post-new.php'])) {
@@ -101,7 +279,67 @@ class AIMT_Admin {
             }
         }
     }
-
+   public function debug_onboarding_state() {
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+    
+    echo '<div class="wrap"><h2>Debug Onboarding State</h2>';
+    
+    $state = get_option('aimt_onboarding_state', array());
+    echo '<h3>Complete State (aimt_onboarding_state):</h3>';
+    echo '<pre>';
+    print_r($state);
+    echo '</pre>';
+    
+    echo '<h3>Individual Options:</h3>';
+    echo '<table class="widefat fixed" cellspacing="0">';
+    echo '<thead><tr><th>Option Name</th><th>Value</th></tr></thead><tbody>';
+    
+    $options = array(
+        'aimt_default_languages' => 'Default Languages',
+        'aimt_translation_languages' => 'Translation Languages',
+        'aimt_selected_post_type' => 'Selected Post Type',
+        'aimt_url_format' => 'URL Format',
+        'aimt_translation_mode' => 'Translation Mode',
+        'aimt_wpml_key' => 'WPML Key',
+        'aimt_support_options' => 'Support Options',
+        'aimt_plugin_options' => 'Plugin Options'
+    );
+    
+    foreach ($options as $option => $label) {
+        $value = get_option($option, 'Not Set');
+        echo '<tr>';
+        echo '<td><strong>' . $label . '</strong><br><code>' . $option . '</code></td>';
+        echo '<td><pre>' . print_r($value, true) . '</pre></td>';
+        echo '</tr>';
+    }
+    
+    echo '</tbody></table>';
+    
+    echo '<h3>Database Query:</h3>';
+    global $wpdb;
+    $result = $wpdb->get_row(
+        $wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+            'aimt_onboarding_state'
+        )
+    );
+    
+    if ($result) {
+        echo '<p>Raw database value:</p>';
+        echo '<pre>' . esc_html($result->option_value) . '</pre>';
+        echo '<p>Decoded:</p>';
+        echo '<pre>';
+        print_r(maybe_unserialize($result->option_value));
+        echo '</pre>';
+    } else {
+        echo '<p>No record found in database.</p>';
+    }
+    
+    echo '<p><a href="' . admin_url('admin.php?page=aimt-onboarding') . '" class="button">Go Back to Onboarding</a></p>';
+    echo '</div>';
+}
     public function onboarding_page() {
         if (
             $_SERVER['REQUEST_METHOD'] === 'POST' &&
@@ -124,28 +362,23 @@ class AIMT_Admin {
         
     $post_types = get_post_types(
     array(
-        // '_builtin' => false,
         'public'   => true
     ),
     'objects'
 );
+   
 
+       $steps = array(
+    'languages' => 'Languages',
+    'register-multilang' => 'Register AI multi language translation',
+    'translation-mode' => 'Translation Mode',
+    'finished' => 'Finished'
+);
 
-        // echo  `<pre>`;
-        // print_r($post_types);
-        // exit();
-        $steps = array(
-            'languages' => 'Languages',
-            'url-format' => 'URL Format',
-            'register-multilang' => 'Register MLI',
-            'translation-mode' => 'Translation Mode',
-            'support' => 'Support',
-            'plugins' => 'Plugins',
-            'finished' => 'Finished'
-        );
+        
         ?>
     <div class="wrap aimt-onboarding">
-      <h1 class="font-poppins text-center main-h">Multilang-implementaion</h1>
+      <h1 class="font-poppins text-center main-h">AI multi language translation</h1>
 
         <div class="container mt-4">
             <div class="progress mb-5">
@@ -257,20 +490,14 @@ class AIMT_Admin {
                     </div>
                 </div>
             </div>
-            <?php
+
+                        <?php
                         $total_posts = 0;
                         foreach ($post_types as $post_type) {
                             if ($post_type->name === 'attachment') continue;
                             $count = wp_count_posts($post_type->name)->publish;
                             $total_posts += $count;
                         }
-                        // echo '<h3 class="mt-4">Total Registered Posts: ' . $total_posts . '</h3>';
-
-                        $all_posts = get_posts(array(
-                            'post_type' => array_keys($post_types),
-                            'numberposts' => -1,
-                            'post_status' => 'publish'
-                        ));
                         ?>
                        <label class="form-label mt-2">Select Post Type</label>
 
@@ -295,155 +522,69 @@ class AIMT_Admin {
                                 </div>
                             </div>
 
-                            <input type="hidden" name="aimt_post_type" id="aimt_post_type">
-
-                        <!-- Dropdown for selecting posts -->
-                        <!-- <label class="form-label mt-2">Select Posts to Translate</label> -->
-                        <!-- <div class="dropdown post-dropdown mb-3">
-                            <button class="btn btn-light border dropdown-toggle" type="button" id="postsDropdownBtn" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                Select Post
-                            </button>
-                            <div class="dropdown-menu p-2" aria-labelledby="postsDropdownBtn">
-                                <input type="text" class="form-control form-control-sm mb-2 post-search" placeholder="Search posts...">
-                                <div class="post-options">
-                                    <?php foreach ($all_posts as $post): ?>
-                                        <div class="dropdown-item post-option" data-id="<?php echo esc_attr($post->ID); ?>">
-                                            <?php echo esc_html($post->post_title); ?> (<?php echo esc_html($post->post_type); ?>)
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                        </div> -->
-                        <!-- <div class="selected-posts"></div>
-                        <small class="form-text text-muted">Search and select posts you want to translate</small>
-
-
-            <div class="selected-translation-languages"></div>         -->
- <!--            <h2 class="font-poppins mt-4">What content should be translated?</h2>
-<p class="text-muted">Select which post types you want to translate.</p>
-<form method="post" action="">
-    <?php wp_nonce_field('aimt_save_post_types', 'aimt_post_types_nonce'); ?>
-
-    <div class="mt-2 d-flex flex-wrap justify-content-center">
-        <?php
-        $post_types = get_post_types(array('public' => true), 'objects');
-        foreach ($post_types as $post_type) :
-            if (in_array($post_type->name, array('attachment'))) continue;
-            $checked = in_array($post_type->name, $translatable_post_types) ? 'checked' : '';
-        ?>
-            <div class="form-check mr-4 mb-2 d-flex flex-column align-items-center" style="min-width: 200px;">
-               <input
-    style="margin-bottom: 4px; margin-right: 150px; margin-top: 4px;"
-    class="form-check-input"
-    type="checkbox"
-    name="aimt_post_types[]"
-    value="<?php echo esc_attr($post_type->name); ?>"
-    id="pt_<?php echo esc_attr($post_type->name); ?>"
-    <?php echo $checked; ?>
->
-                <label class="form-check-label text-center" for="pt_<?php echo esc_attr($post_type->name); ?>">
-                    <strong><?php echo esc_html($post_type->labels->singular_name); ?></strong>
-                    <small class="text-muted d-block"><?php echo esc_html($post_type->description ?: $post_type->name); ?></small>
-                </label>
-            </div>
-        <?php endforeach; ?>
-    </div>
-
-    <div class="mt-4 text-center">
-        <button type="submit" class="button button-primary">Save Selected Post Types</button>
-    </div>
-</form>
- -->            </div>   
+                            <input type="hidden" name="aimt_post_type" id="aimt_post_type" data-required="true">
+            <div class="selected-translation-languages" data-required="true"></div>
+            </div>   
              
                             <div class="mt-4">
-                                    <button class="button button-primary next-step btn-next" data-next="url-format">Next</button>
+                                    <button class="button button-primary next-step btn-next" data-next="register-multilang">Next</button>
                                 </div>
                             </div>
-                            <div class="step-content step-url-format">
-                                <h2 class="ofnt-poppins">How would You like to format your site's URL?</h2>
-                                <div class="url-options mt-4">
-                                    <div class="form-check mb-3">
-                                        <input style="margin-top:8px"  class="form-check-input" type="radio" name="url_format" id="format-subdirectory" value="subdirectory" checked>
-                                        <label  style="margin-left: 24px"  class="form-check-label" for="format-subdirectory">
-                                            <strong class="font-poppins">Different Languages in directore</strong><br>
-                                            <small>implementaion.com/fr/about-us/</small>
-                                        </label>
-                                    </div>
-                                    <div class="form-check mb-3">
-                                        <input style="margin-top:8px" class="form-check-input" type="radio" name="url_format" id="format-subdomain" value="subdomain">
-                                        <label style="margin-left: 24px"  class="form-check-label" for="format-subdomain">
-                                            <strong class="font-poppins" >A different domain per language</strong><br>
-                                            <small>fr.implementaion.com/about-us/</small>
-                                        </label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input style="margin-top:8px"  class="form-check-input" type="radio" name="url_format" id="format-parameter" value="parameter">
-                                        <label style="margin-left: 24px"  class="form-check-label" for="format-parameter">
-                                            <strong class="font-poppins">langauge name added as a parameter</strong><br>
-                                            <small>spanish: implementaion.com/about-us/?lang=fr</small>
-                                        </label>
+                            <div class="step-content step-register-multilang">
+                                <h2>Register AI multi language translation</h2>
+                                <p>Connect your site to AI multi language translation for enhanced multilingual features.</p>
+                                <div class="mt-4">
+                                    <div class="form-group">
+                                        <label for="wpml_key" class="font-poppins">AI multi language translation Registration Key</label>
+                                        <input type="text" class="form-control" id="wpml_key" name="wpml_key" placeholder="Enter your AI multi language translation key" required>
+                                        <small class="form-text text-muted">Get your key from your AI multi language translation account.</small>
                                     </div>
                                 </div>
                                 <div class="mt-4">
                                     <button class="button prev-step" data-prev="languages">Back</button>
-                                    <button class="button button-primary next-step" data-next="register-multilang">Next</button>
-                                </div>
-                            </div>
-                            <div class="step-content step-register-multilang">
-                                <h2>Register MLI</h2>
-                                <p>Connect your site to MLI for enhanced multilingual features.</p>
-                                <div class="mt-4">
-                                    <div class="form-group">
-                                        <label for="wpml_key" class="font-poppins">MLI Registration Key</label>
-                                        <input type="text" class="form-control" id="wpml_key" placeholder="Enter your WPML key">
-                                        <small class="form-text text-muted">Get your key from <a href="https://mli.org" target="_blank">MLI.org</a></small>
-                                    </div>
-                                </div>
-                                <div class="mt-4">
-                                    <button class="button prev-step" data-prev="url-format">Back</button>
                                     <button class="button button-primary next-step" data-next="translation-mode">Next</button>
                                 </div>
                             </div>
                             <div class="step-content step-translation-mode">
                                 <h2>How would you like to translate the content?</h2> 
-                                <div class="row mt-4">
-                                    <div class="col-md-6 mb-4">
-                                        <div class="card p-4 h-100">
-                                            <h4>Translate Everything Automatically</h4>
-                                            <p class="text-muted">Let WPML do the translating for you</p>
-                                            <ul class="features-list">
-                                                <li>✓ Translates all your published content automatically</li>
-                                                <li>✓ Uses machine translation powered by Google, Microsoft, or DeepL</li>
-                                                <li>✓ Instantly translates new content and updates translations whenever you edit a page or post</li>
-                                                <li>✓ You can review translations before publishing or hire professional reviewers</li>
-                                                <li>✓ Affordable and fast</li>
-                                            </ul>
-                                            <button class="button button-primary btn-block choose-mode" data-mode="auto">Choose</button>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="col-md-6 mb-4">
-                                        <div class="card p-4 h-100">
-                                            <h4>Translate What You Choose</h4>
-                                            <p class="text-muted">You decide what to translate and who'll translate it</p>
-                                            <ul class="features-list">
-                                                <li>✓ Translate yourself</li>
-                                                <li>✓ Use automatic translation on the content you choose</li>
-                                                <li>✓ Work with translators that are users of your site</li>
-                                                <li>✓ Send to professional translation services</li>
-                                            </ul>
-                                            <button class="button btn-block choose-mode" data-mode="manual">Choose</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="mt-4">
+                                 <div class="row mt-4">
+                                     <div class="col-md-6 mb-4">
+                                         <div class="card p-4 h-100">
+                                             <h4>Translate Everything Automatically</h4>
+                                             <p class="text-muted">Let AI Multilag do the translating for you</p>
+                                             <ul class="features-list">
+                                                 <li>✓ Translates all your published content automatically</li>
+                                                 <li>✓ Uses machine translation powered by Google, Microsoft, or DeepL</li>
+                                                 <li>✓ Instantly translates new content and updates translations whenever you edit a page or post</li>
+                                                 <li>✓ You can review translations before publishing or hire professional reviewers</li>
+                                                 <li>✓ Affordable and fast</li>
+                                             </ul>
+                                             <button class="button button-primary btn-block choose-mode" data-mode="auto">Choose</button>
+                                         </div>
+                                     </div>
+                                     
+                                     <div class="col-md-6 mb-4">
+                                         <div class="card p-4 h-100">
+                                             <h4>Translate What You Choose</h4>
+                                             <p class="text-muted">You decide what to translate and who'll translate it</p>
+                                             <ul class="features-list">
+                                                 <li>✓ Translate yourself</li>
+                                                 <li>✓ Use automatic translation on the content you choose</li>
+                                                 <li>✓ Work with translators that are users of your site</li>
+                                                 <li>✓ Send to professional translation services</li>
+                                             </ul>
+                                             <button class="button btn-block choose-mode" data-mode="manual">Choose</button>
+                                         </div>
+                                     </div>
+                                 </div>
+                                 
+                                 <div class="mt-4">
                                     <button class="button prev-step" data-prev="register-multilang">Back</button>
-                                    <button class="button button-primary next-step" data-next="support">Next</button>
-                                </div>
-                            </div>
+                                    <button class="button button-primary next-step" data-next="finished">Next</button>
+                                 </div>
+                             </div>
 
-                            <div class="step-content step-support">
+                             <!-- <div class="step-content step-support">
                                 <h2>Support</h2>
                                 <p>Select your support preferences.</p>
                                 
@@ -477,8 +618,8 @@ class AIMT_Admin {
                                     <button class="button prev-step" data-prev="translation-mode">Back</button>
                                     <button class="button button-primary next-step" data-next="plugins">Next</button>
                                 </div>
-                            </div>
-                            <div class="step-content step-plugins">
+                            </div> -->
+                            <!-- <div class="step-content step-plugins">
                                 <h2>Recommended Plugins</h2>
                                 <p>Enhance your multilingual site with these recommended plugins.</p>
                                 
@@ -520,11 +661,11 @@ class AIMT_Admin {
                                     <button class="button prev-step" data-prev="support">Back</button>
                                     <button class="button button-primary next-step" data-next="finished">Next</button>
                                 </div>
-                            </div>
+                            </div> -->
 
-                            <div class="step-content step-finished text-center">
-                                <h2>🎉 Setup Complete!</h2>
-                                <p class="lead">Your multilingual site is ready to go!</p>
+                             <div class="step-content step-finished text-center">
+                                 <h2>🎉 Setup Complete!</h2>
+                                 <p class="lead">Your multilingual site is ready to go!</p>
                                 
                                 <div class="success-icon mb-4">
                                     <span class="dashicons dashicons-yes-alt" style="font-size: 80px; color: #46b450;"></span>
@@ -537,14 +678,70 @@ class AIMT_Admin {
                                 </div>
                                 
                                 <div class="mt-4">
-                                    <button class="button prev-step" data-prev="plugins">Back</button>
-                                    <a href="<?php echo admin_url('admin.php?page=aimt-settings'); ?>" class="button button-primary">Go to Settings</a>
-                                    <a href="<?php echo home_url(); ?>" class="button" target="_blank">Visit Site</a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                                    <button class="button prev-step" data-prev="translation-mode">Back</button>
+                                     <a href="<?php echo admin_url('admin.php?page=aimt-settings'); ?>" class="button button-primary">Go to Settings</a>
+                                     <a href="<?php echo home_url(); ?>" class="button" target="_blank">Visit Site</a>
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+                <?php
+                ?>
+
+<script type="text/javascript">
+(function($){
+  $(document).on('click', '.next-step', function(e){
+    var next = $(this).data('next');
+
+    if(next === 'register-multilang'){
+      var selLangsCount = $('.selected-languages').children().length;
+      if (selLangsCount === 0) {
+        selLangsCount = $('.selected-languages .selected-language, .selected-languages .tag, .selected-languages input[type="hidden"]').length;
+      }
+      if(selLangsCount === 0){
+        alert('Please select at least one default language.');
+        e.preventDefault(); return false;
+      }
+
+      var transCount = $('.selected-translation-languages').children().length;
+      if (transCount === 0) {
+        transCount = $('.selected-translation-languages .selected-language, .selected-translation-languages .tag, .selected-translation-languages input[type="hidden"]').length;
+      }
+      if(transCount === 0){
+        alert('Please select at least one translation language.');
+        e.preventDefault(); return false;
+      }
+
+      if(!$('#aimt_post_type').val()){
+        alert('Please select a post type.');
+        e.preventDefault(); return false;
+      }
+    }
+
+    if(next === 'translation-mode'){
+      if($('#wpml_key').length && !$('#wpml_key').val().trim()){
+        alert('Please enter your AI multi language translation registration key.');
+        e.preventDefault(); return false;
+      }
+    }
+
+    if(next === 'finished'){
+      if(!$('.choose-mode.active').length){
+        alert('Please choose a translation mode.');
+        e.preventDefault(); return false;
+      }
+    }
+  });
+
+  $(document).on('click', '.choose-mode', function(e){
+    $('.choose-mode').removeClass('active');
+    $(this).addClass('active');
+  });
+
+})(jQuery);
+</script>
+
                 <?php
             }
                 public function settings_page() {
