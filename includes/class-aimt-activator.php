@@ -23,6 +23,8 @@ class AIMT_Activator {
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql);
 
+        self::normalize_column_names( $table_name, $wpdb );
+
         add_option('aimt_default_languages', array('en'), '', 'yes'); 
         $default_translation_languages = array('es', 'fr', 'de'); 
         add_option('aimt_translation_languages', $default_translation_languages, '', 'yes');
@@ -33,7 +35,6 @@ class AIMT_Activator {
         add_option('aimt_show_onboarding', 1, '', 'yes');
         add_option('aimt_last_sync', '', '', 'yes');
     
-        ///jst for example for transaltion for now
         $example = array(
             'string' => 'The Only Firm Focused Solely On Implementation',
             'lang' => 'en',
@@ -47,5 +48,44 @@ class AIMT_Activator {
         }
 
         set_transient('aimt_activate_redirect', true, 60);
+    }
+
+    private static function normalize_column_names( $table_name, $wpdb ) {
+        if ( get_option('aimt_column_case_migrated') ) {
+            return;
+        }
+
+        $exists = $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $table_name) );
+        if ( $exists !== $table_name ) {
+            return;
+        }
+
+        $columns = $wpdb->get_col( "SHOW COLUMNS FROM `{$table_name}`" );
+        if ( empty( $columns ) ) {
+            return;
+        }
+
+        $map = array(
+            'Id'               => "CHANGE `Id` `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT",
+            'String'           => "CHANGE `String` `string` LONGTEXT NOT NULL",
+            'lang'             => false, 
+            'translated_Lang'  => "CHANGE `translated_Lang` `translated_lang` VARCHAR(10) NOT NULL",
+            'Translated_string'=> "CHANGE `Translated_string` `translated_string` LONGTEXT NOT NULL",
+            'Created_at'       => "CHANGE `Created_at` `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP",
+            'Updated_at'       => "CHANGE `Updated_at` `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+        );
+
+        $sqls = array();
+        foreach ( $map as $old => $change_sql ) {
+            if ( $change_sql && in_array( $old, $columns, true ) ) {
+                $sqls[] = "ALTER TABLE `{$table_name}` {$change_sql};";
+            }
+        }
+
+        foreach ( $sqls as $sql ) {
+            $wpdb->query( $sql );
+        }
+
+        update_option('aimt_column_case_migrated', 1, false);
     }
 }
