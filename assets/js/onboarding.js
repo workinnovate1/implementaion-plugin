@@ -1,5 +1,9 @@
 jQuery(document).ready(function ($) {
-  const STORAGE_KEY = "aimt_onboarding_state_v1";
+  console.log("AIMT Onboarding Script Loaded");
+  console.log("AJAX URL:", ajaxurl);
+  console.log("Nonce:", aimtOnboardingData.nonce);
+
+  const aimtNonce = aimtOnboardingData.nonce;
 
   let state = {
     step: "languages",
@@ -49,8 +53,8 @@ jQuery(document).ready(function ($) {
     const alertHtml = `
       <div class="aimt-stored-alert alert alert-success alert-dismissible fade show" role="alert" style="margin-bottom:20px;">
         <div>
-          <strong>All data saved locally.</strong>
-          Your onboarding choices are stored in localStorage.
+          <strong>All data saved in database.</strong>
+          Your onboarding choices are stored in WordPress options.
         </div>
         ${summaryHtmlForState(state)}
         <div style="margin-top:8px;">
@@ -71,8 +75,8 @@ jQuery(document).ready(function ($) {
 
     $(document).on("click", ".aimt-view-console", function (e) {
       e.preventDefault();
-      console.log("AIMT onboarding stored state:", state);
-      alert("Stored data printed to console.");
+      console.log("AIMT onboarding database state:", state);
+      // alert("Stored data printed to console.");
     });
   }
 
@@ -80,7 +84,6 @@ jQuery(document).ready(function ($) {
     $(".aimt-stored-alert").remove();
   }
 
-  
   function isStateComplete() {
     const hasDefaultLang =
       Object.keys(state.selectedLanguages || {}).length > 0;
@@ -99,55 +102,198 @@ jQuery(document).ready(function ($) {
   }
 
   function saveState() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      console.log("AIMT onboarding saved state:", state);
-    } catch (e) {
-      console.warn("Could not save onboarding state", e);
-    }
-    handleStoredAlertDisplay();
+    console.log("Saving state to database:", state);
+
+    $.ajax({
+      url: ajaxurl,
+      type: "POST",
+      data: {
+        action: "aimt_save_onboarding",
+        nonce: aimtNonce,
+        state: JSON.stringify(state),
+      },
+      success: function (response) {
+        if (response.success) {
+          console.log("✅ State saved successfully:", response.data);
+          console.log("Response:", response);
+          handleStoredAlertDisplay();
+
+          setTimeout(function () {
+            $.ajax({
+              url: ajaxurl,
+              type: "POST",
+              data: {
+                action: "aimt_load_onboarding",
+                nonce: aimtNonce,
+              },
+              success: function (loadResponse) {
+                if (loadResponse.success) {
+                  console.log("✅ Load test successful:", loadResponse.data);
+                }
+              },
+            });
+          }, 500);
+        } else {
+          console.error("❌ Failed to save state:", response.data);
+        }
+      },
+      error: function (xhr, status, error) {
+        console.error("❌ AJAX error saving state:", error);
+        console.error("Status:", status);
+        console.error("XHR:", xhr);
+      },
+    });
   }
 
-  function loadState() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      state = $.extend(true, {}, state, parsed);
-      console.log("AIMT onboarding loaded state:", state);
-    } catch (e) {
-      console.warn("Could not load onboarding state", e);
-    }
+  function loadState(callback) {
+    console.log("Loading state from database...");
+
+    $.ajax({
+      url: ajaxurl,
+      type: "POST",
+      data: {
+        action: "aimt_load_onboarding",
+        nonce: aimtNonce,
+      },
+      success: function (response) {
+        console.log("Load response:", response);
+
+        if (response.success && response.data.exists) {
+          console.log("✅ State loaded from database:", response.data.state);
+          state = $.extend(true, {}, state, response.data.state);
+
+          // normalize to plain objects (avoid arrays with numeric keys)
+          if (Array.isArray(state.selectedLanguages)) {
+            var tmp = {};
+            state.selectedLanguages.forEach(function (name, idx) {
+              // try to preserve code if provided as {code: name} objects
+              if (typeof name === "object") {
+                var keys = Object.keys(name);
+                tmp[keys[0]] = name[keys[0]];
+              } else {
+                // fallback: keep value as name with generated key
+                tmp["lang_" + idx] = name;
+              }
+            });
+            state.selectedLanguages = tmp;
+          }
+          if (
+            !state.selectedLanguages ||
+            typeof state.selectedLanguages !== "object"
+          ) {
+            state.selectedLanguages = {};
+          }
+
+          if (Array.isArray(state.translationLanguages)) {
+            var tmp2 = {};
+            state.translationLanguages.forEach(function (name, idx) {
+              if (typeof name === "object") {
+                var keys = Object.keys(name);
+                tmp2[keys[0]] = name[keys[0]];
+              } else {
+                tmp2["lang_" + idx] = name;
+              }
+            });
+            state.translationLanguages = tmp2;
+          }
+          if (
+            !state.translationLanguages ||
+            typeof state.translationLanguages !== "object"
+          ) {
+            state.translationLanguages = {};
+          }
+
+          renderDefaultLanguages();
+          renderTranslationLanguages();
+          syncTranslationLanguages();
+
+          if (state.urlFormat) {
+            $(`input[name="url_format"][value="${state.urlFormat}"]`).prop(
+              "checked",
+              true
+            );
+          }
+
+          if (state.wpmlKey) {
+            $("#wpml_key").val(state.wpmlKey);
+          }
+
+          if (state.translationMode) {
+            $(".choose-mode").removeClass("active");
+            $(`.choose-mode[data-mode="${state.translationMode}"]`).addClass(
+              "active"
+            );
+          }
+
+          navigateToStep(state.step);
+
+          if (callback) callback();
+        } else {
+          console.log("ℹ️ No saved state found in database");
+          // ensure objects exist
+          state.selectedLanguages = state.selectedLanguages || {};
+          state.translationLanguages = state.translationLanguages || {};
+          if (callback) callback();
+        }
+      },
+      error: function (xhr, status, error) {
+        console.error("❌ AJAX error loading state:", error);
+        if (callback) callback();
+      },
+    });
   }
 
   function clearState() {
-    localStorage.removeItem(STORAGE_KEY);
-    state = {
-      step: "languages",
-      selectedLanguages: { en: "English" },
-      translationLanguages: {},
-      postType: "",
-      urlFormat: "subdirectory",
-      wpmlKey: "",
-      translationMode: "",
-      support: {
-        support_docs: true,
-        support_forum: false,
-        support_email: false,
+    $.ajax({
+      url: ajaxurl,
+      type: "POST",
+      data: {
+        action: "aimt_clear_onboarding",
+        nonce: aimtNonce,
       },
-      plugins: {
-        plugin_woocommerce: true,
-        plugin_seo: true,
-        plugin_slug: false,
-        plugin_media: false,
+      success: function (response) {
+        if (response.success) {
+          state = {
+            step: "languages",
+            selectedLanguages: { en: "English" },
+            translationLanguages: {},
+            postType: "",
+            urlFormat: "subdirectory",
+            wpmlKey: "",
+            translationMode: "",
+            support: {
+              support_docs: true,
+              support_forum: false,
+              support_email: false,
+            },
+            plugins: {
+              plugin_woocommerce: true,
+              plugin_seo: true,
+              plugin_slug: false,
+              plugin_media: false,
+            },
+          };
+
+          renderDefaultLanguages();
+          renderTranslationLanguages();
+          syncTranslationLanguages();
+          navigateToStep("languages");
+          hideStoredAlert();
+
+          console.log("✅ State cleared from database");
+        }
       },
-    };
-    saveState();
+      error: function (xhr, status, error) {
+        console.error("❌ AJAX error clearing state:", error);
+        console.error("Status:", status);
+        console.error("XHR:", xhr);
+      },
+    });
   }
 
   function handleStoredAlertDisplay() {
     if (state.step === "finished" && isStateComplete()) {
-      hideStoredAlert(); 
+      hideStoredAlert();
       showStoredAlert();
     } else {
       hideStoredAlert();
@@ -155,12 +301,14 @@ jQuery(document).ready(function ($) {
   }
 
   function renderDefaultLanguages() {
-    let labels = [];
-    let hiddenInputs = "";
+    var labels = [];
+    var hiddenInputs = "";
 
     $(".language-option").removeClass("active");
 
-    $.each(state.selectedLanguages, function (code, name) {
+    // treat as object map
+    Object.keys(state.selectedLanguages || {}).forEach(function (code) {
+      var name = state.selectedLanguages[code];
       labels.push(name);
       hiddenInputs += `<input type="hidden" name="languages[]" value="${code}">`;
       $(`.language-option[data-code="${code}"]`).addClass("active");
@@ -173,12 +321,13 @@ jQuery(document).ready(function ($) {
   }
 
   function renderTranslationLanguages() {
-    let labels = [];
-    let hiddenInputs = "";
+    var labels = [];
+    var hiddenInputs = "";
 
     $(".translation-language-option").removeClass("active");
 
-    $.each(state.translationLanguages, function (code, name) {
+    Object.keys(state.translationLanguages || {}).forEach(function (code) {
+      var name = state.translationLanguages[code];
       labels.push(name);
       hiddenInputs += `<input type="hidden" name="translation_languages[]" value="${code}">`;
       $(`.translation-language-option[data-code="${code}"]`).addClass("active");
@@ -188,6 +337,18 @@ jQuery(document).ready(function ($) {
       labels.length ? labels.join(", ") : "Select translation languages"
     );
     $(".selected-translation-languages").html(hiddenInputs);
+  }
+
+  // add helper to update the translation dropdown button label
+  function updateTranslationDropdownLabel() {
+    var labels = Object.keys(state.translationLanguages || {}).map(function (
+      code
+    ) {
+      return state.translationLanguages[code];
+    });
+    $("#translationLanguagesDropdownBtn").text(
+      labels.length ? labels.join(", ") : "Select translation languages"
+    );
   }
 
   function syncTranslationLanguages() {
@@ -202,16 +363,6 @@ jQuery(document).ready(function ($) {
 
     renderTranslationLanguages();
   }
-
-  
-  loadState();
-
-  
-  renderDefaultLanguages();
-  renderTranslationLanguages();
-  syncTranslationLanguages();
-
-  handleStoredAlertDisplay();
 
   function navigateToStep(step) {
     state.step = step || "languages";
@@ -244,18 +395,32 @@ jQuery(document).ready(function ($) {
     });
   }
 
- 
-  navigateToStep(state.step);
-
+  loadState(function () {
+    handleStoredAlertDisplay();
+  });
 
   $(document).on("click", ".language-option", function (e) {
     e.preventDefault();
-    const code = $(this).data("code");
-    const name = $(this).data("name");
-    state.selectedLanguages = {};
-    state.selectedLanguages[code] = name;
+    e.stopPropagation();
+    const $el = $(this);
+    const code = $el.data("code");
+    const name = $el.data("name") || $el.text().trim();
+    console.log("language click:", code, name);
+
+    if (!state.selectedLanguages || Array.isArray(state.selectedLanguages)) {
+      state.selectedLanguages = {};
+    }
+
+    // toggle selection (allow multiple default languages)
+    if (state.selectedLanguages[code]) {
+      delete state.selectedLanguages[code];
+    } else {
+      state.selectedLanguages[code] = name;
+    }
+
     renderDefaultLanguages();
     syncTranslationLanguages();
+    updateTranslationDropdownLabel();
     saveState();
   });
 
@@ -268,13 +433,35 @@ jQuery(document).ready(function ($) {
 
   $(document).on("click", ".translation-language-option", function (e) {
     e.preventDefault();
+    e.stopPropagation();
+
     const code = $(this).data("code");
-    const name = $(this).data("name");
-    if (!state.translationLanguages[code]) {
-      state.translationLanguages[code] = name;
-      renderTranslationLanguages();
-      saveState();
+    const name = $(this).data("name") || $(this).text().trim();
+
+    if (
+      !state.translationLanguages ||
+      Array.isArray(state.translationLanguages)
+    ) {
+      state.translationLanguages = {};
     }
+
+    if (state.selectedLanguages && state.selectedLanguages[code]) {
+      // optionally show a small feedback
+      $(this).addClass("disabled");
+      setTimeout(() => $(this).removeClass("disabled"), 600);
+      return;
+    }
+
+    // toggle selection
+    if (state.translationLanguages[code]) {
+      delete state.translationLanguages[code];
+    } else {
+      state.translationLanguages[code] = name;
+    }
+
+    renderTranslationLanguages();
+    updateTranslationDropdownLabel();
+    saveState();
   });
 
   $(document).on("keyup", ".translation-language-search", function () {
@@ -284,31 +471,87 @@ jQuery(document).ready(function ($) {
     });
   });
 
+  if (!state.postTypes) {
+    state.postTypes = {};
+    if (state.postType) {
+      state.postTypes[state.postType] = state.postType;
+    }
+  }
+
+  function renderSelectedPostTypes() {
+    var labels = [];
+    var hiddenInputs = "";
+
+    $(".post-type-option").removeClass("active");
+
+    Object.keys(state.postTypes || {}).forEach(function (pt) {
+      var label = state.postTypes[pt] || pt;
+      labels.push(label);
+      hiddenInputs +=
+        '<input type="hidden" name="post_types[]" value="' + pt + '">';
+      // mark option active
+      $('.post-type-option[data-post-type="' + pt + '"]').addClass("active");
+    });
+
+    $("#postTypeDropdownBtn").text(
+      labels.length ? labels.join(", ") : "Select Post Type"
+    );
+    $(".selected-post-types").html(hiddenInputs);
+
+    if ($("#aimt_post_type").length) {
+      var first = Object.keys(state.postTypes || {})[0] || "";
+      $("#aimt_post_type").val(first);
+    } else {
+      var first = Object.keys(state.postTypes || {})[0] || "";
+      $("<input>")
+        .attr({
+          type: "hidden",
+          id: "aimt_post_type",
+          name: "aimt_post_type",
+          value: first,
+        })
+        .appendTo(".selected-post-types");
+    }
+  }
+
+  function updatePostTypeDropdownLabel() {
+    var labels = Object.keys(state.postTypes || {}).map(function (pt) {
+      return state.postTypes[pt];
+    });
+    $("#postTypeDropdownBtn").text(
+      labels.length ? labels.join(", ") : "Select Post Type"
+    );
+  }
+
+  $(document).off("click", ".post-type-option");
   $(document).on("click", ".post-type-option", function (e) {
     e.preventDefault();
     e.stopPropagation();
-    const postType = $(this).data("post-type");
-    const label = $.trim($(this).text());
-    state.postType = postType;
-    $("#aimt_post_type").val(postType);
-    $("#postTypeDropdownBtn").text(label);
-    const $dropdown = $(this).closest(".dropdown");
-    const $toggle = $dropdown.find(".dropdown-toggle");
-    if ($toggle.length && typeof $toggle.dropdown === "function") {
-      try {
-        $toggle.dropdown("hide");
-      } catch (err) {
-        $dropdown.removeClass("show");
-        $dropdown.find(".dropdown-menu").removeClass("show");
-        $toggle.attr("aria-expanded", "false");
-      }
-    } else {
-      $dropdown.removeClass("show");
-      $dropdown.find(".dropdown-menu").removeClass("show");
-      $toggle.attr("aria-expanded", "false");
+
+    const $el = $(this);
+    const postType = $el.data("post-type");
+    const label = $el.data("name") || $el.text().trim();
+    console.log("post-type click:", postType, label);
+
+    if (!state.postTypes || Array.isArray(state.postTypes)) {
+      state.postTypes = {};
     }
+
+    // toggle
+    if (state.postTypes[postType]) {
+      delete state.postTypes[postType];
+    } else {
+      state.postTypes[postType] = label || postType;
+    }
+
+    renderSelectedPostTypes();
+    updatePostTypeDropdownLabel();
     saveState();
   });
+
+  try {
+    renderSelectedPostTypes();
+  } catch (e) {}
 
   $(document).on("change", 'input[name="url_format"]', function () {
     state.urlFormat = $(this).val();
@@ -360,29 +603,55 @@ jQuery(document).ready(function ($) {
     navigateToStep(prev);
   });
 
-  if (state.urlFormat) {
-    $(`input[name="url_format"][value="${state.urlFormat}"]`).prop(
-      "checked",
-      true
-    );
-  }
+  $(
+    '<button class="button button-secondary" id="aimt-clear-state" style="margin-left:10px;">Clear All Data</button>'
+  )
+    .insertAfter(".step-finished .button-primary")
+    .on("click", function (e) {
+      e.preventDefault();
+      if (confirm("Are you sure you want to clear all onboarding data?")) {
+        clearState();
+      }
+    });
 
-  if (state.wpmlKey) {
-    $("#wpml_key").val(state.wpmlKey);
-  }
+  window.testOnboardingStorage = function () {
+    console.clear();
+    console.log("=== AIMT Onboarding Storage Test ===");
 
-  if (state.translationMode) {
-    $(".choose-mode").removeClass("active");
-    $(`.choose-mode[data-mode="${state.translationMode}"]`).addClass("active");
-  }
+    $.ajax({
+      url: ajaxurl,
+      type: "POST",
+      data: {
+        action: "aimt_save_onboarding",
+        nonce: aimtNonce,
+        state: JSON.stringify({
+          test: "test_data",
+          timestamp: new Date().toISOString(),
+        }),
+      },
+      success: function (response) {
+        console.log("✅ Save test response:", response);
 
-  Object.keys(state.support).forEach(function (k) {
-    $(`#${k}`).prop("checked", !!state.support[k]);
-  });
-
-  Object.keys(state.plugins).forEach(function (k) {
-    $(`#${k}`).prop("checked", !!state.plugins[k]);
-  });
-
-  updateProgressBar(getStepIndex(state.step));
+        setTimeout(function () {
+          console.log("\n✅ Loading test data...");
+          $.ajax({
+            url: ajaxurl,
+            type: "POST",
+            data: {
+              action: "aimt_load_onboarding",
+              nonce: aimtNonce,
+            },
+            success: function (loadResponse) {
+              console.log("✅ Load test response:", loadResponse);
+              alert("✅ Test completed! Check console for details.");
+            },
+          });
+        }, 1000);
+      },
+      error: function (xhr, status, error) {
+        console.error("❌ Test failed:", error);
+        alert("❌ Test failed! Check console for errors.");
+      },
+    });
+  };
 });

@@ -16,7 +16,6 @@ jQuery(document).ready(function ($) {
 
     if (translateNow) {
         alert('User chose to translate the post.');
-        // Yahan aap redirect ya function call kar sakte ho
         // window.location.href = 'admin.php?page=aimt-onboarding&post_id=' + aimtData.post_id;
     } else {
         console.log('User chose not to translate the post.');
