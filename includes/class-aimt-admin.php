@@ -111,7 +111,6 @@ class AIMT_Admin {
             }
         }
         
-        // allow multiple post types
         $sanitized['postTypes'] = array();
         if (isset($state['postTypes']) && is_array($state['postTypes'])) {
             foreach ($state['postTypes'] as $pt) {
@@ -119,18 +118,15 @@ class AIMT_Admin {
                 if ($clean) $sanitized['postTypes'][] = $clean;
             }
         } else {
-            // support legacy single postType
             if (!empty($state['postType'])) {
                 $clean = sanitize_text_field($state['postType']);
                 if ($clean) $sanitized['postTypes'][] = $clean;
             }
         }
         
-        // $sanitized['urlFormat'] = sanitize_text_field($state['urlFormat'] ?? 'subdirectory');
         $sanitized['wpmlKey'] = sanitize_text_field($state['wpmlKey'] ?? '');
         $sanitized['translationMode'] = sanitize_text_field($state['translationMode'] ?? '');
         
-        // removed 'support' and 'plugins' from sanitized state as requested
         return $sanitized;
     }
 
@@ -147,15 +143,12 @@ class AIMT_Admin {
             update_option('aimt_selected_post_types', array_values($state['postTypes']));
         }
         
-        // update_option('aimt_url_format', $state['urlFormat']);
         update_option('aimt_translation_mode', $state['translationMode']);
         
-        // Persist registration / API key under a single unique option name
         if (!empty($state['wpmlKey'])) {
             update_option('aimt_api_key', sanitize_text_field($state['wpmlKey']));
         }
 
-        // removed plugin options persistence (recommended plugins removed)
     }
 
     private function clear_individual_options() {
@@ -225,7 +218,10 @@ class AIMT_Admin {
     
 
     public function assets($hook) {
-        if (strpos($hook, 'aimt-onboarding') !== false) {
+        $is_onboarding = (strpos($hook, 'aimt-onboarding') !== false);
+        $is_settings   = (strpos($hook, 'aimt-settings') !== false);
+
+        if ($is_onboarding) {
             wp_enqueue_style(
                 'aimt-bootstrap',
                 'https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css'
@@ -239,13 +235,6 @@ class AIMT_Admin {
                 true
             );
 
-            wp_enqueue_style(
-                'aimt-onboarding-css',
-                plugin_dir_url(__FILE__) . '../assets/css/onboarding.css',
-                array(),
-                '1.0'
-            );
-            
             wp_enqueue_script(
                 'aimt-onboarding-js',
                 plugin_dir_url(__FILE__) . '../assets/js/onboarding.js',
@@ -253,10 +242,22 @@ class AIMT_Admin {
                 '1.0',
                 true
             );
+        }
 
+        // Shared styling for onboarding wizard and settings CRUD page
+        if ($is_onboarding || $is_settings) {
+            wp_enqueue_style(
+                'aimt-onboarding-css',
+                plugin_dir_url(__FILE__) . '../assets/css/onboarding.css',
+                array(),
+                '1.0'
+            );
+        }
+
+        if ($is_onboarding) {
             wp_localize_script('aimt-onboarding-js', 'aimtOnboardingData', [
                 'ajaxurl' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('aimt_onboarding_nonce')
+                'nonce'   => wp_create_nonce('aimt_onboarding_nonce'),
             ]);
         }
 
@@ -342,7 +343,6 @@ class AIMT_Admin {
     echo '</div>';
 }
     public function onboarding_page() {
-        // Handle non-AJAX save of full onboarding JSON (hidden form submit)
         if (
             $_SERVER['REQUEST_METHOD'] === 'POST' &&
             isset($_POST['aimt_onboarding_state']) &&
@@ -784,7 +784,6 @@ class AIMT_Admin {
                     global $wpdb;
         $table_name = $wpdb->prefix . 'aimt_string_translations';
 
-        // language map (same as onboarding) - extend as needed
         $common_languages = array(
             'en' => 'English',
             'es' => 'Spanish',
@@ -798,10 +797,8 @@ class AIMT_Admin {
             'ar' => 'Arabic'
         );
 
-        // ---- HANDLE FORM ACTIONS: add / edit / delete ----
         if ( $_SERVER['REQUEST_METHOD'] === 'POST' && current_user_can('manage_options') ) {
 
-            // ADD
             if ( isset($_POST['action']) && $_POST['action'] === 'aimt_add_translation' ) {
                 if ( ! wp_verify_nonce( $_POST['aimt_add_translation_nonce'] ?? '', 'aimt_add_translation' ) ) {
                     echo '<div class="notice notice-error"><p>Security check failed.</p></div>';
@@ -828,7 +825,6 @@ class AIMT_Admin {
                 }
             }
 
-            // EDIT
             if ( isset($_POST['action']) && $_POST['action'] === 'aimt_edit_translation' ) {
                 if ( ! wp_verify_nonce( $_POST['aimt_edit_translation_nonce'] ?? '', 'aimt_edit_translation' ) ) {
                     echo '<div class="notice notice-error"><p>Security check failed.</p></div>';
@@ -859,7 +855,6 @@ class AIMT_Admin {
                 }
             }
 
-            // DELETE
             if ( isset($_POST['action']) && $_POST['action'] === 'aimt_delete_translation' ) {
                 if ( ! wp_verify_nonce( $_POST['aimt_delete_translation_nonce'] ?? '', 'aimt_delete_translation' ) ) {
                     echo '<div class="notice notice-error"><p>Security check failed.</p></div>';
@@ -873,7 +868,6 @@ class AIMT_Admin {
             }
         }
 
-        // ---- EDIT FORM (if requested) ----
         $edit_row = null;
         if ( isset($_GET['edit_translation']) ) {
             $edit_id = intval( $_GET['edit_translation'] );
@@ -882,139 +876,212 @@ class AIMT_Admin {
             }
         }
 
-        // ---- FETCH ALL TRANSLATIONS ----
         $translations = $wpdb->get_results( "SELECT * FROM {$table_name} ORDER BY id DESC", ARRAY_A );
 
-        // ---- RENDER UI ----
         ?>
-        <div class="wrap">
-            <h1>AI Multi-Language Translation Settings</h1>
-
-            <h2 style="margin-top:1.5em;">Manage String Translations</h2>
-
-            <!-- Add / Edit form -->
-            <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:1.5em;">
-                <div style="flex:1;min-width:300px;max-width:700px;">
-                    <?php if ( $edit_row ): ?>
-                        <h3>Edit Translation #<?php echo esc_html( $edit_row['id'] ); ?></h3>
-                        <form method="post">
-                            <?php wp_nonce_field('aimt_edit_translation', 'aimt_edit_translation_nonce'); ?>
-                            <input type="hidden" name="action" value="aimt_edit_translation">
-                            <input type="hidden" name="id" value="<?php echo esc_attr($edit_row['id']); ?>">
-                            <p><label>Original string (source):</label><br>
-                                <textarea name="string" rows="3" style="width:100%"><?php echo esc_textarea($edit_row['string']); ?></textarea>
-                            </p>
-                            <p>
-                                <label>Source language:</label><br>
-                                <select name="lang" style="width:100%;max-width:320px;">
-                                    <?php foreach ($common_languages as $code => $label): ?>
-                                        <option value="<?php echo esc_attr($code); ?>" <?php selected($edit_row['lang'], $code); ?>><?php echo esc_html("{$label} ({$code})"); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </p>
-                            <p><label>Translated string:</label><br>
-                                <textarea name="translated_string" rows="3" style="width:100%"><?php echo esc_textarea($edit_row['translated_string']); ?></textarea>
-                            </p>
-                            <p>
-                                <label>Translated language:</label><br>
-                                <select name="translated_lang" style="width:100%;max-width:320px;">
-                                    <?php foreach ($common_languages as $code => $label): ?>
-                                        <option value="<?php echo esc_attr($code); ?>" <?php selected($edit_row['translated_lang'], $code); ?>><?php echo esc_html("{$label} ({$code})"); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </p>
-                            <p><input type="submit" class="button button-primary" value="Save Translation"></p>
-                        </form>
-                        <p><a class="button" href="<?php echo admin_url('admin.php?page=aimt-settings'); ?>">Cancel</a></p>
-
-                    <?php else: ?>
-                        <h3>Add New Translation</h3>
-                        <form method="post">
-                            <?php wp_nonce_field('aimt_add_translation', 'aimt_add_translation_nonce'); ?>
-                            <input type="hidden" name="action" value="aimt_add_translation">
-                            <p><label>Original string (source):</label><br>
-                                <textarea name="string" rows="3" style="width:100%"><?php echo isset($_POST['string']) ? esc_textarea($_POST['string']) : ''; ?></textarea>
-                            </p>
-                            <p>
-                                <label>Source language:</label><br>
-                                <select name="lang" style="width:100%;max-width:320px;">
-                                    <?php foreach ($common_languages as $code => $label): ?>
-                                        <option value="<?php echo esc_attr($code); ?>"><?php echo esc_html("{$label} ({$code})"); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </p>
-                            <p><label>Translated string:</label><br>
-                                <textarea name="translated_string" rows="3" style="width:100%"><?php echo isset($_POST['translated_string']) ? esc_textarea($_POST['translated_string']) : ''; ?></textarea>
-                            </p>
-                            <p>
-                                <label>Translated language:</label><br>
-                                <select name="translated_lang" style="width:100%;max-width:320px;">
-                                    <?php foreach ($common_languages as $code => $label): ?>
-                                        <option value="<?php echo esc_attr($code); ?>"><?php echo esc_html("{$label} ({$code})"); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </p>
-                            <p><input type="submit" class="button button-primary" value="Add Translation"></p>
-                        </form>
-                    <?php endif; ?>
-                </div>
-
-                <!-- Quick import / info panel -->
-                <div style="width:320px;min-width:220px;">
-                    <h3>Notes</h3>
-                    <p>Translations are stored in the <code><?php echo esc_html( $table_name ); ?></code> table.</p>
-                    <p>You can edit or delete existing entries from the table below.</p>
+        <div class="wrap aimt-settings-page">
+            <div class="aimt-settings-header">
+                <div class="aimt-settings-header-content">
+                    <h1>AI Multi-Language Translation</h1>
+                    <p class="aimt-subtitle">Manage string-level translations stored by the plugin.</p>
                 </div>
             </div>
 
-            <!-- Translations table -->
-            <h3>All Translations</h3>
-            <table class="widefat fixed striped" style="width:100%;max-width:1200px;">
-                <thead>
-                    <tr>
-                        <th style="width:60px;">ID</th>
-                        <th>Original String</th>
-                        <th style="width:160px;">Source (code)</th>
-                        <th style="width:160px;">Target (code)</th>
-                        <th>Translated String</th>
-                        <th style="width:160px;">Created</th>
-                        <th style="width:160px;">Updated</th>
-                        <th style="width:140px;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if ( ! empty( $translations ) ): ?>
-                        <?php foreach ( $translations as $row ): ?>
+            <div class="aimt-settings-container">
+                <div class="aimt-form-panel">
+                    <div class="aimt-form-card">
+                        <div class="aimt-form-header">
+                            <?php if ( $edit_row ): ?>
+                                <h2>Edit Translation</h2>
+                                <span class="aimt-form-id">#<?php echo esc_html( $edit_row['id'] ); ?></span>
+                            <?php else: ?>
+                                <h2>Add New Translation</h2>
+                            <?php endif; ?>
+                        </div>
+                        <p class="aimt-form-subtitle">
+                            Create or update a translation entry. These values are used when rendering multilingual strings on your site.
+                        </p>
+
+                        <div class="aimt-form">
+                            <?php if ( $edit_row ): ?>
+                                <form method="post">
+                                    <?php wp_nonce_field('aimt_edit_translation', 'aimt_edit_translation_nonce'); ?>
+                                    <input type="hidden" name="action" value="aimt_edit_translation">
+                                    <input type="hidden" name="id" value="<?php echo esc_attr($edit_row['id']); ?>">
+
+                                    <div class="aimt-form-group">
+                                        <label class="aimt-form-label">Original string (source)</label>
+                                        <textarea name="string" rows="3" class="aimt-form-control"><?php echo esc_textarea($edit_row['string']); ?></textarea>
+                                    </div>
+
+                                    <div class="aimt-form-row">
+                                        <div class="aimt-form-group">
+                                            <label class="aimt-form-label">Source language</label>
+                                            <select name="lang" class="aimt-form-control">
+                                                <?php foreach ($common_languages as $code => $label): ?>
+                                                    <option value="<?php echo esc_attr($code); ?>" <?php selected($edit_row['lang'], $code); ?>>
+                                                        <?php echo esc_html("{$label} ({$code})"); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="aimt-form-group">
+                                            <label class="aimt-form-label">Translated language</label>
+                                            <select name="translated_lang" class="aimt-form-control">
+                                                <?php foreach ($common_languages as $code => $label): ?>
+                                                    <option value="<?php echo esc_attr($code); ?>" <?php selected($edit_row['translated_lang'], $code); ?>>
+                                                        <?php echo esc_html("{$label} ({$code})"); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="aimt-form-group">
+                                        <label class="aimt-form-label">Translated string</label>
+                                        <textarea name="translated_string" rows="3" class="aimt-form-control"><?php echo esc_textarea($edit_row['translated_string']); ?></textarea>
+                                    </div>
+
+                                    <div class="aimt-form-actions">
+                                        <button type="submit" class="button button-primary aimt-btn-primary">Save Translation</button>
+                                        <a class="button aimt-btn-secondary" href="<?php echo admin_url('admin.php?page=aimt-settings'); ?>">Cancel</a>
+                                    </div>
+                                </form>
+                            <?php else: ?>
+                                <form method="post">
+                                    <?php wp_nonce_field('aimt_add_translation', 'aimt_add_translation_nonce'); ?>
+                                    <input type="hidden" name="action" value="aimt_add_translation">
+
+                                    <div class="aimt-form-group">
+                                        <label class="aimt-form-label">Original string (source)</label>
+                                        <textarea name="string" rows="3" class="aimt-form-control"><?php echo isset($_POST['string']) ? esc_textarea($_POST['string']) : ''; ?></textarea>
+                                    </div>
+
+                                    <div class="aimt-form-row">
+                                        <div class="aimt-form-group">
+                                            <label class="aimt-form-label">Source language</label>
+                                            <select name="lang" class="aimt-form-control">
+                                                <?php foreach ($common_languages as $code => $label): ?>
+                                                    <option value="<?php echo esc_attr($code); ?>"><?php echo esc_html("{$label} ({$code})"); ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="aimt-form-group">
+                                            <label class="aimt-form-label">Translated language</label>
+                                            <select name="translated_lang" class="aimt-form-control">
+                                                <?php foreach ($common_languages as $code => $label): ?>
+                                                    <option value="<?php echo esc_attr($code); ?>"><?php echo esc_html("{$label} ({$code})"); ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="aimt-form-group">
+                                        <label class="aimt-form-label">Translated string</label>
+                                        <textarea name="translated_string" rows="3" class="aimt-form-control"><?php echo isset($_POST['translated_string']) ? esc_textarea($_POST['translated_string']) : ''; ?></textarea>
+                                    </div>
+
+                                    <div class="aimt-form-actions">
+                                        <button type="submit" class="button button-primary aimt-btn-primary">Add Translation</button>
+                                    </div>
+                                </form>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="aimt-info-panel">
+                    <div class="aimt-info-card">
+                        <div class="aimt-info-header">
+                            <h3>Notes</h3>
+                        </div>
+                        <div class="aimt-info-content">
+                            <div class="aimt-info-section">
+                                <p class="aimt-info-text">
+                                    Translations are stored in the
+                                    <span class="aimt-code"><?php echo esc_html( $table_name ); ?></span>
+                                    table.
+                                </p>
+                            </div>
+                            <div class="aimt-info-section">
+                                <p class="aimt-info-text">
+                                    You can edit or delete existing entries from the table below.
+                                </p>
+                            </div>
+                            <div class="aimt-info-section">
+                                <p class="aimt-info-text">
+                                    Changes here take effect immediately wherever these strings are rendered.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="aimt-table-section">
+                <div class="aimt-table-header">
+                    <h2>All Translations</h2>
+                    <span class="aimt-table-count">
+                        <?php echo intval( count( $translations ) ); ?> entries
+                    </span>
+                </div>
+                <div class="aimt-table-wrapper">
+                    <table class="widefat fixed striped aimt-table">
+                        <thead>
                             <tr>
-                                <td><?php echo esc_html( $row['id'] ); ?></td>
-                                <td><?php echo esc_html( $row['string'] ); ?></td>
-                                <td>
-                                    <?php echo esc_html( $row['lang'] ); ?><br>
-                                    <small><?php echo esc_html( $common_languages[ $row['lang'] ] ?? '' ); ?></small>
-                                </td>
-                                <td>
-                                    <?php echo esc_html( $row['translated_lang'] ); ?><br>
-                                    <small><?php echo esc_html( $common_languages[ $row['translated_lang'] ] ?? '' ); ?></small>
-                                </td>
-                                <td><?php echo esc_html( $row['translated_string'] ); ?></td>
-                                <td><?php echo esc_html( $row['created_at'] ); ?></td>
-                                <td><?php echo esc_html( $row['updated_at'] ); ?></td>
-                                <td>
-                                    <a class="button" href="<?php echo esc_url( add_query_arg( 'edit_translation', intval($row['id']), admin_url('admin.php?page=aimt-settings') ) ); ?>">Edit</a>
-                                    <form method="post" style="display:inline-block;margin:0 0 0 6px;" onsubmit="return confirm('Delete translation #<?php echo esc_attr($row['id']); ?>?');">
-                                        <?php wp_nonce_field('aimt_delete_translation', 'aimt_delete_translation_nonce'); ?>
-                                        <input type="hidden" name="action" value="aimt_delete_translation">
-                                        <input type="hidden" name="id" value="<?php echo esc_attr($row['id']); ?>">
-                                        <input type="submit" class="button button-secondary" value="Delete">
-                                    </form>
-                                </td>
+                                <th class="aimt-col-id">ID</th>
+                                <th>Original String</th>
+                                <th class="aimt-col-source">Source (code)</th>
+                                <th class="aimt-col-target">Target (code)</th>
+                                <th>Translated String</th>
+                                <th class="aimt-col-created">Created</th>
+                                <th class="aimt-col-updated">Updated</th>
+                                <th class="aimt-col-actions">Actions</th>
                             </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr><td colspan="8">No translations found.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+                        </thead>
+                        <tbody>
+                            <?php if ( ! empty( $translations ) ): ?>
+                                <?php foreach ( $translations as $row ): ?>
+                                    <tr>
+                                        <td><?php echo esc_html( $row['id'] ); ?></td>
+                                        <td><?php echo esc_html( $row['string'] ); ?></td>
+                                        <td>
+                                            <span class="aimt-badge aimt-badge-code">
+                                                <?php echo esc_html( $row['lang'] ); ?>
+                                            </span>
+                                            <span class="aimt-badge-label">
+                                                <?php echo esc_html( $common_languages[ $row['lang'] ] ?? '' ); ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="aimt-badge aimt-badge-code">
+                                                <?php echo esc_html( $row['translated_lang'] ); ?>
+                                            </span>
+                                            <span class="aimt-badge-label">
+                                                <?php echo esc_html( $common_languages[ $row['translated_lang'] ] ?? '' ); ?>
+                                            </span>
+                                        </td>
+                                        <td><?php echo esc_html( $row['translated_string'] ); ?></td>
+                                        <td><?php echo esc_html( $row['created_at'] ); ?></td>
+                                        <td><?php echo esc_html( $row['updated_at'] ); ?></td>
+                                        <td>
+                                            <a class="button aimt-btn-edit" href="<?php echo esc_url( add_query_arg( 'edit_translation', intval($row['id']), admin_url('admin.php?page=aimt-settings') ) ); ?>">Edit</a>
+                                            <form method="post" style="display:inline-block;margin:0 0 0 6px;" onsubmit="return confirm('Delete translation #<?php echo esc_attr($row['id']); ?>?');">
+                                                <?php wp_nonce_field('aimt_delete_translation', 'aimt_delete_translation_nonce'); ?>
+                                                <input type="hidden" name="action" value="aimt_delete_translation">
+                                                <input type="hidden" name="id" value="<?php echo esc_attr($row['id']); ?>">
+                                                <input type="submit" class="button button-secondary aimt-btn-delete" value="Delete">
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr><td colspan="8">No translations found.</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
         </div>
         <?php
