@@ -17,6 +17,9 @@ class AIMT_Admin {
         if (!is_admin()) return;
 
         if (!in_array($post->post_type, ['post', 'page'])) return;
+        if (isset($post->post_status) && $post->post_status !== 'publish') {
+            return;
+        }
 
         update_post_meta($post_id, '_aimt_show_alert', 1);
     }
@@ -244,7 +247,6 @@ class AIMT_Admin {
             );
         }
 
-        // Shared styling for onboarding wizard and settings CRUD page
         if ($is_onboarding || $is_settings) {
             wp_enqueue_style(
                 'aimt-onboarding-css',
@@ -726,54 +728,8 @@ class AIMT_Admin {
 
 <script type="text/javascript">
 (function($){
-  $(document).on('click', '.next-step', function(e){
-    var next = $(this).data('next');
-
-    if(next === 'register-multilang'){
-      var selLangsCount = $('.selected-languages').children().length;
-      if (selLangsCount === 0) {
-        selLangsCount = $('.selected-languages .selected-language, .selected-languages .tag, .selected-languages input[type="hidden"]').length;
-      }
-      if(selLangsCount === 0){
-        alert('Please select at least one default language.');
-        e.preventDefault(); return false;
-      }
-
-      var transCount = $('.selected-translation-languages').children().length;
-      if (transCount === 0) {
-        transCount = $('.selected-translation-languages .selected-language, .selected-translation-languages .tag, .selected-translation-languages input[type="hidden"]').length;
-      }
-      if(transCount === 0){
-        alert('Please select at least one translation language.');
-        e.preventDefault(); return false;
-      }
-
-      if(!$('#aimt_post_type').val()){
-        alert('Please select a post type.');
-        e.preventDefault(); return false;
-      }
-    }
-
-    if(next === 'translation-mode'){
-      if($('#wpml_key').length && !$('#wpml_key').val().trim()){
-        alert('Please enter your AI multi language translation registration key.');
-        e.preventDefault(); return false;
-      }
-    }
-
-    if(next === 'finished'){
-      if(!$('.choose-mode.active').length){
-        alert('Please choose a translation mode.');
-        e.preventDefault(); return false;
-      }
-    }
-  });
-
-  $(document).on('click', '.choose-mode', function(e){
-    $('.choose-mode').removeClass('active');
-    $(this).addClass('active');
-  });
-
+  // Validation is now handled in onboarding.js
+  // Keeping this script block for any future inline scripts if needed
 })(jQuery);
 </script>
 
@@ -796,6 +752,21 @@ class AIMT_Admin {
             'ru' => 'Russian',
             'ar' => 'Arabic'
         );
+
+        $available_source_codes = (array) get_option( 'aimt_default_languages', array() );
+        $available_target_codes = (array) get_option( 'aimt_translation_languages', array() );
+
+        if ( ! empty( $available_source_codes ) ) {
+            $source_options = array_intersect_key( $common_languages, array_flip( $available_source_codes ) );
+        } else {
+            $source_options = $common_languages;
+        }
+
+        if ( ! empty( $available_target_codes ) ) {
+            $target_options = array_intersect_key( $common_languages, array_flip( $available_target_codes ) );
+        } else {
+            $target_options = $common_languages;
+        }
 
         if ( $_SERVER['REQUEST_METHOD'] === 'POST' && current_user_can('manage_options') ) {
 
@@ -918,9 +889,9 @@ class AIMT_Admin {
                                         <div class="aimt-form-group">
                                             <label class="aimt-form-label">Source language</label>
                                             <select name="lang" class="aimt-form-control">
-                                                <?php foreach ($common_languages as $code => $label): ?>
-                                                    <option value="<?php echo esc_attr($code); ?>" <?php selected($edit_row['lang'], $code); ?>>
-                                                        <?php echo esc_html("{$label} ({$code})"); ?>
+                                                <?php foreach ( $source_options as $code => $label ): ?>
+                                                    <option value="<?php echo esc_attr( $code ); ?>" <?php selected( $edit_row['lang'] ?? '', $code ); ?>>
+                                                        <?php echo esc_html( "{$label} ({$code})" ); ?>
                                                     </option>
                                                 <?php endforeach; ?>
                                             </select>
@@ -928,9 +899,9 @@ class AIMT_Admin {
                                         <div class="aimt-form-group">
                                             <label class="aimt-form-label">Translated language</label>
                                             <select name="translated_lang" class="aimt-form-control">
-                                                <?php foreach ($common_languages as $code => $label): ?>
-                                                    <option value="<?php echo esc_attr($code); ?>" <?php selected($edit_row['translated_lang'], $code); ?>>
-                                                        <?php echo esc_html("{$label} ({$code})"); ?>
+                                                <?php foreach ( $target_options as $code => $label ): ?>
+                                                    <option value="<?php echo esc_attr( $code ); ?>" <?php selected( $edit_row['translated_lang'] ?? '', $code ); ?>>
+                                                        <?php echo esc_html( "{$label} ({$code})" ); ?>
                                                     </option>
                                                 <?php endforeach; ?>
                                             </select>
@@ -961,16 +932,16 @@ class AIMT_Admin {
                                         <div class="aimt-form-group">
                                             <label class="aimt-form-label">Source language</label>
                                             <select name="lang" class="aimt-form-control">
-                                                <?php foreach ($common_languages as $code => $label): ?>
-                                                    <option value="<?php echo esc_attr($code); ?>"><?php echo esc_html("{$label} ({$code})"); ?></option>
+                                                <?php foreach ( $source_options as $code => $label ): ?>
+                                                    <option value="<?php echo esc_attr( $code ); ?>"><?php echo esc_html( "{$label} ({$code})" ); ?></option>
                                                 <?php endforeach; ?>
                                             </select>
                                         </div>
                                         <div class="aimt-form-group">
                                             <label class="aimt-form-label">Translated language</label>
                                             <select name="translated_lang" class="aimt-form-control">
-                                                <?php foreach ($common_languages as $code => $label): ?>
-                                                    <option value="<?php echo esc_attr($code); ?>"><?php echo esc_html("{$label} ({$code})"); ?></option>
+                                                <?php foreach ( $target_options as $code => $label ): ?>
+                                                    <option value="<?php echo esc_attr( $code ); ?>"><?php echo esc_html( "{$label} ({$code})" ); ?></option>
                                                 <?php endforeach; ?>
                                             </select>
                                         </div>

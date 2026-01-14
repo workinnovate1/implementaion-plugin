@@ -593,7 +593,50 @@ jQuery(document).ready(function ($) {
 
   $(".next-step").on("click", function (e) {
     e.preventDefault();
+    e.stopPropagation();
     const next = $(this).data("next");
+
+    // Validation before navigation
+    if (next === "register-multilang") {
+      const hasDefaultLangs =
+        state.selectedLanguages &&
+        Object.keys(state.selectedLanguages).length > 0;
+      if (!hasDefaultLangs) {
+        alert("Please select at least one default language.");
+        return false;
+      }
+
+      const hasTranslationLangs =
+        state.translationLanguages &&
+        Object.keys(state.translationLanguages).length > 0;
+      if (!hasTranslationLangs) {
+        alert("Please select at least one translation language.");
+        return false;
+      }
+
+      const hasPostType =
+        state.postTypes &&
+        Object.keys(state.postTypes).length > 0;
+      if (!hasPostType) {
+        alert("Please select a post type.");
+        return false;
+      }
+    }
+
+    if (next === "translation-mode") {
+      if (!state.wpmlKey || !state.wpmlKey.trim()) {
+        alert("Please enter your AI multi language translation registration key.");
+        return false;
+      }
+    }
+
+    if (next === "finished") {
+      if (!state.translationMode || !state.translationMode.trim()) {
+        alert("Please choose a translation mode.");
+        return false;
+      }
+    }
+
     navigateToStep(next);
   });
 
