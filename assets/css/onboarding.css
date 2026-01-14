@@ -1299,7 +1299,7 @@ select:focus-visible {
 }
 
 .wrap.aimt-onboarding > div:first-of-type {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
+  /* background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important; */
   color: white !important;
   padding: 48px !important;
   border-radius: var(--border-radius) !important;
