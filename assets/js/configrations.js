@@ -29,13 +29,11 @@ jQuery(document).ready(function ($) {
   function summaryHtmlForState(s) {
     const dl = [];
     dl.push(
-      `<strong>Default:</strong> ${
-        Object.values(s.selectedLanguages || {}).join(", ") || "—"
+      `<strong>Default:</strong> ${Object.values(s.selectedLanguages || {}).join(", ") || "—"
       }`
     );
     dl.push(
-      `<strong>Translation:</strong> ${
-        Object.values(s.translationLanguages || {}).join(", ") || "—"
+      `<strong>Translation:</strong> ${Object.values(s.translationLanguages || {}).join(", ") || "—"
       }`
     );
     dl.push(`<strong>Post Type:</strong> ${s.postType || "—"}`);
@@ -66,11 +64,11 @@ jQuery(document).ready(function ($) {
       </div>
     `;
 
-    const $container = $(".aimt-onboarding .container").first();
+    const $container = $(".aimt-configrations .container").first();
     if ($container.length) {
       $container.prepend(alertHtml);
     } else {
-      $(".aimt-onboarding").prepend(alertHtml);
+      $(".aimt-configrations").prepend(alertHtml);
     }
 
     $(document).on("click", ".aimt-view-console", function (e) {
@@ -248,7 +246,7 @@ jQuery(document).ready(function ($) {
       url: ajaxurl,
       type: "POST",
       data: {
-        action: "aimt_clear_onboarding",
+        action: "aimt_clear_configration",
         nonce: aimtNonce,
       },
       success: function (response) {
@@ -551,7 +549,7 @@ jQuery(document).ready(function ($) {
 
   try {
     renderSelectedPostTypes();
-  } catch (e) {}
+  } catch (e) { }
 
   $(document).on("change", 'input[name="url_format"]', function () {
     state.urlFormat = $(this).val();

@@ -1,17 +1,20 @@
 <?php
 
-class AIMT_Admin {
-    public function __construct(){
+class AIMT_Admin
+{
+    public function __construct()
+    {
         add_action('admin_menu', array($this, 'register_menu'));
         add_action('admin_enqueue_scripts', array($this, 'assets'));
         add_action('save_post', array($this, 'aimt_show_alert_on_post_save'), 10, 3);
         add_action('wp_ajax_aimt_clear_alert_flag', array($this, 'aimt_clear_alert_flag'));
         add_action('wp_ajax_aimt_save_onboarding', array($this, 'save_onboarding_state'));
         add_action('wp_ajax_aimt_load_onboarding', array($this, 'load_onboarding_state'));
-        add_action('wp_ajax_aimt_clear_onboarding', array($this, 'clear_onboarding_state'));
+        add_action('wp_ajax_aimt_clear_configration', array($this, 'clear_onboarding_state'));
     }
 
-    public function aimt_show_alert_on_post_save($post_id, $post, $update) {
+    public function aimt_show_alert_on_post_save($post_id, $post, $update)
+    {
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
         if (wp_is_post_revision($post_id)) return;
         if (!is_admin()) return;
@@ -24,7 +27,8 @@ class AIMT_Admin {
         update_post_meta($post_id, '_aimt_show_alert', 1);
     }
 
-    public function aimt_clear_alert_flag() {
+    public function aimt_clear_alert_flag()
+    {
         check_ajax_referer('aimt_alert_nonce', 'nonce');
 
         $post_id = intval($_POST['post_id']);
@@ -33,22 +37,23 @@ class AIMT_Admin {
         wp_send_json_success();
     }
 
-    public function save_onboarding_state() {
-        check_ajax_referer('aimt_onboarding_nonce', 'nonce');
-        
+    public function save_onboarding_state()
+    {
+        check_ajax_referer('aimt_configration_nonce', 'nonce');
+
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
         }
 
         $state = isset($_POST['state']) ? json_decode(stripslashes($_POST['state']), true) : null;
-        
+
         if ($state) {
             $sanitized_state = $this->sanitize_onboarding_state($state);
-            
-            update_option('aimt_onboarding_state', $sanitized_state, false);
-            
+
+            update_option('aimt_configration_state', $sanitized_state, false);
+
             $this->save_individual_options($sanitized_state);
-            
+
             wp_send_json_success(array(
                 'message' => 'State saved successfully',
                 'state' => $sanitized_state
@@ -58,40 +63,43 @@ class AIMT_Admin {
         }
     }
 
-    public function load_onboarding_state() {
-        check_ajax_referer('aimt_onboarding_nonce', 'nonce');
-        
+    public function load_onboarding_state()
+    {
+        check_ajax_referer('aimt_configration_nonce', 'nonce');
+
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
         }
 
-        $state = get_option('aimt_onboarding_state', array());
-        
+        $state = get_option('aimt_configration_state', array());
+
         wp_send_json_success(array(
             'state' => $state,
             'exists' => !empty($state)
         ));
     }
 
-    public function clear_onboarding_state() {
-        check_ajax_referer('aimt_onboarding_nonce', 'nonce');
-        
+    public function clear_onboarding_state()
+    {
+        check_ajax_referer('aimt_configration_nonce', 'nonce');
+
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
         }
 
-        delete_option('aimt_onboarding_state');
-        
+        delete_option('aimt_configration_state');
+
         $this->clear_individual_options();
-        
+
         wp_send_json_success('State cleared successfully');
     }
 
-    private function sanitize_onboarding_state($state) {
+    private function sanitize_onboarding_state($state)
+    {
         $sanitized = array();
-        
+
         $sanitized['step'] = sanitize_text_field($state['step'] ?? 'languages');
-        
+
         $sanitized['selectedLanguages'] = array();
         if (isset($state['selectedLanguages']) && is_array($state['selectedLanguages'])) {
             foreach ($state['selectedLanguages'] as $code => $name) {
@@ -102,7 +110,7 @@ class AIMT_Admin {
                 }
             }
         }
-        
+
         $sanitized['translationLanguages'] = array();
         if (isset($state['translationLanguages']) && is_array($state['translationLanguages'])) {
             foreach ($state['translationLanguages'] as $code => $name) {
@@ -113,7 +121,7 @@ class AIMT_Admin {
                 }
             }
         }
-        
+
         $sanitized['postTypes'] = array();
         if (isset($state['postTypes']) && is_array($state['postTypes'])) {
             foreach ($state['postTypes'] as $pt) {
@@ -126,35 +134,36 @@ class AIMT_Admin {
                 if ($clean) $sanitized['postTypes'][] = $clean;
             }
         }
-        
+
         $sanitized['wpmlKey'] = sanitize_text_field($state['wpmlKey'] ?? '');
         $sanitized['translationMode'] = sanitize_text_field($state['translationMode'] ?? '');
-        
+
         return $sanitized;
     }
 
-    private function save_individual_options($state) {
+    private function save_individual_options($state)
+    {
         if (!empty($state['selectedLanguages'])) {
             update_option('aimt_default_languages', array_keys($state['selectedLanguages']));
         }
-        
+
         if (!empty($state['translationLanguages'])) {
             update_option('aimt_translation_languages', array_keys($state['translationLanguages']));
         }
-        
+
         if (!empty($state['postTypes'])) {
             update_option('aimt_selected_post_types', array_values($state['postTypes']));
         }
-        
+
         update_option('aimt_translation_mode', $state['translationMode']);
-        
+
         if (!empty($state['wpmlKey'])) {
             update_option('aimt_api_key', sanitize_text_field($state['wpmlKey']));
         }
-
     }
 
-    private function clear_individual_options() {
+    private function clear_individual_options()
+    {
         delete_option('aimt_default_languages');
         delete_option('aimt_translation_languages');
         delete_option('aimt_selected_post_types');
@@ -164,9 +173,10 @@ class AIMT_Admin {
         // removed delete_option('aimt_plugin_options');
     }
 
-    public function get_onboarding_config() {
-        $state = get_option('aimt_onboarding_state', array());
-        
+    public function get_onboarding_config()
+    {
+        $state = get_option('aimt_configration_state', array());
+
         if (empty($state)) {
             $state = array(
                 'selectedLanguages' => array_flip(get_option('aimt_default_languages', array('en'))),
@@ -179,49 +189,45 @@ class AIMT_Admin {
                 // removed 'plugins' option retrieval
             );
         }
-        
+
         return $state;
     }
 
-    public function is_onboarding_complete() {
+    public function is_onboarding_complete()
+    {
         $state = $this->get_onboarding_config();
-        return !empty($state['selectedLanguages']) && 
-               !empty($state['translationLanguages']) && 
-               !empty($state['postTypes']) &&
-               !empty($state['translationMode']);
+        return !empty($state['selectedLanguages']) &&
+            !empty($state['translationLanguages']) &&
+            !empty($state['postTypes']) &&
+            !empty($state['translationMode']);
     }
 
-   public function register_menu(){
-    add_menu_page(
-        'AI Multi-Language',
-        'AI Multi-Language',
-        'manage_options',
-        'aimt-settings',
-        array($this, 'settings_page'),
-        'dashicons-translation',
-        80
-    );
-    add_submenu_page(
-        'aimt-settings',
-        'Onboarding',
-        'Onboarding',
-        'manage_options',
-        'aimt-onboarding',
-        array($this, 'onboarding_page')
-    );
-    add_submenu_page(
-        null, // Hide from menu
-        'Debug Onboarding',
-        'Debug Onboarding',
-        'manage_options',
-        'aimt-debug-onboarding',
-        array($this, 'debug_onboarding_state')
-    );
-}
-    
+    public function register_menu()
+    {
+        add_menu_page(
+            'AI Multi-Language',
+            'AI Multi-Language',
+            'manage_options',
+            'aimt-settings',
+            array($this, 'settings_page'),
+            'dashicons-translation',
+            80
+        );
+        add_submenu_page(
+            'aimt-settings',
+            'Configrations',
+            'Configrations',
+            'manage_options',
+            'aimt-configrations',
+            array($this, 'configration_page')
+        );
 
-    public function assets($hook) {
-        $is_onboarding = (strpos($hook, 'aimt-onboarding') !== false);
+    }
+
+
+    public function assets($hook)
+    {
+        $is_onboarding = (strpos($hook, 'aimt-configrations') !== false);
         $is_settings   = (strpos($hook, 'aimt-settings') !== false);
 
         if ($is_onboarding) {
@@ -239,8 +245,8 @@ class AIMT_Admin {
             );
 
             wp_enqueue_script(
-                'aimt-onboarding-js',
-                plugin_dir_url(__FILE__) . '../assets/js/onboarding.js',
+                'aimt-configrations-js',
+                plugin_dir_url(__FILE__) . '../assets/js/configrations.js',
                 array('jquery', 'aimt-bootstrap'),
                 '1.0',
                 true
@@ -249,7 +255,7 @@ class AIMT_Admin {
 
         if ($is_onboarding || $is_settings) {
             wp_enqueue_style(
-                'aimt-onboarding-css',
+                'aimt-configrations-css',
                 plugin_dir_url(__FILE__) . '../assets/css/onboarding.css',
                 array(),
                 '1.0'
@@ -257,9 +263,9 @@ class AIMT_Admin {
         }
 
         if ($is_onboarding) {
-            wp_localize_script('aimt-onboarding-js', 'aimtOnboardingData', [
+            wp_localize_script('aimt-configrations-js', 'aimtOnboardingData', [
                 'ajaxurl' => admin_url('admin-ajax.php'),
-                'nonce'   => wp_create_nonce('aimt_onboarding_nonce'),
+                'nonce'   => wp_create_nonce('aimt_configration_nonce'),
             ]);
         }
 
@@ -283,88 +289,29 @@ class AIMT_Admin {
             }
         }
     }
-   public function debug_onboarding_state() {
-    if (!current_user_can('manage_options')) {
-        return;
-    }
-    
-    echo '<div class="wrap"><h2>Debug Onboarding State</h2>';
-    
-    $state = get_option('aimt_onboarding_state', array());
-    echo '<h3>Complete State (aimt_onboarding_state):</h3>';
-    echo '<pre>';
-    print_r($state);
-    echo '</pre>';
-    
-    echo '<h3>Individual Options:</h3>';
-    echo '<table class="widefat fixed" cellspacing="0">';
-    echo '<thead><tr><th>Option Name</th><th>Value</th></tr></thead><tbody>';
-    
-    $options = array(
-        'aimt_default_languages' => 'Default Languages',
-        'aimt_translation_languages' => 'Translation Languages',
-        'aimt_selected_post_type' => 'Selected Post Type',
-        'aimt_url_format' => 'URL Format',
-        'aimt_translation_mode' => 'Translation Mode',
-        'aimt_wpml_key' => 'WPML Key',
-        'aimt_support_options' => 'Support Options'
-        // removed 'aimt_plugin_options' entry
-    );
-    
-    foreach ($options as $option => $label) {
-        $value = get_option($option, 'Not Set');
-        echo '<tr>';
-        echo '<td><strong>' . $label . '</strong><br><code>' . $option . '</code></td>';
-        echo '<td><pre>' . print_r($value, true) . '</pre></td>';
-        echo '</tr>';
-    }
-    
-    echo '</tbody></table>';
-    
-    echo '<h3>Database Query:</h3>';
-    global $wpdb;
-    $result = $wpdb->get_row(
-        $wpdb->prepare(
-            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
-            'aimt_onboarding_state'
-        )
-    );
-    
-    if ($result) {
-        echo '<p>Raw database value:</p>';
-        echo '<pre>' . esc_html($result->option_value) . '</pre>';
-        echo '<p>Decoded:</p>';
-        echo '<pre>';
-        print_r(maybe_unserialize($result->option_value));
-        echo '</pre>';
-    } else {
-        echo '<p>No record found in database.</p>';
-    }
-    
-    echo '<p><a href="' . admin_url('admin.php?page=aimt-onboarding') . '" class="button">Go Back to Onboarding</a></p>';
-    echo '</div>';
-}
-    public function onboarding_page() {
+ 
+    public function configration_page()
+    {
         if (
             $_SERVER['REQUEST_METHOD'] === 'POST' &&
-            isset($_POST['aimt_onboarding_state']) &&
-            isset($_POST['aimt_onboarding_nonce']) &&
-            wp_verify_nonce($_POST['aimt_onboarding_nonce'], 'aimt_onboarding_save') &&
+            isset($_POST['aimt_configration_state']) &&
+            isset($_POST['aimt_configration_nonce']) &&
+            wp_verify_nonce($_POST['aimt_configration_nonce'], 'aimt_onboarding_save') &&
             current_user_can('manage_options')
         ) {
-            $raw = wp_unslash($_POST['aimt_onboarding_state']);
+            $raw = wp_unslash($_POST['aimt_configration_state']);
             $decoded = json_decode($raw, true);
-            if ( json_last_error() === JSON_ERROR_NONE && is_array($decoded) ) {
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 $sanitized = $this->sanitize_onboarding_state($decoded);
                 // save full state and individual options (keeps data separated)
-                update_option('aimt_onboarding_state', $sanitized);
+                update_option('aimt_configration_state', $sanitized);
                 $this->save_individual_options($sanitized);
                 echo '<div class="updated"><p>Onboarding configuration saved.</p></div>';
             } else {
                 echo '<div class="error"><p>Invalid onboarding data submitted.</p></div>';
             }
         }
-        
+
         if (
             $_SERVER['REQUEST_METHOD'] === 'POST' &&
             isset($_POST['aimt_posts']) &&
@@ -378,39 +325,39 @@ class AIMT_Admin {
 
             echo '<div class="updated"><p>Selected posts saved!</p></div>';
         }
-        
+
         $translatable_post_types = get_option(
             'aimt_translatable_post_types',
             array('post', 'page')
         );
-        
-    $post_types = get_post_types(
-    array(
-        'public'   => true
-    ),
-    'objects'
-);
-   
 
-       $steps = array(
+        $post_types = get_post_types(
+            array(
+                'public'   => true
+            ),
+            'objects'
+        );
+
+
+        $steps = array(
             'languages' => 'Languages',
             'register-multilang' => 'Register AI multi language translation',
             'translation-mode' => 'Translation Mode',
             'finished' => 'Finished'
         );
 
-        $template_path = plugin_dir_path( __FILE__ ) . '../templates/html/onboarding-page.php';
-        if ( file_exists( $template_path ) ) {
+        $template_path = plugin_dir_path(__FILE__) . '../templates/html/onboarding-page.php';
+        if (file_exists($template_path)) {
             include $template_path;
         } else {
-            echo '<div class="wrap"><div class="notice notice-error"><p>Onboarding template not found: ' . esc_html( $template_path ) . '</p></div></div>';
+            echo '<div class="wrap"><div class="notice notice-error"><p>Onboarding template not found: ' . esc_html($template_path) . '</p></div></div>';
         }
 
         /* 
        .
         
         ?>
-        <div class="wrap aimt-onboarding">
+        <div class="wrap aimt-configrations">
           <h1 class="font-poppins text-center main-h">AI multi language translation</h1>
 
             <div class="container mt-4">
@@ -658,7 +605,7 @@ class AIMT_Admin {
 
         <script type="text/javascript">
         (function($){
-          // Validation is now handled in onboarding.js
+          // Validation is now handled in configrations.js
           // Keeping this script block for any future inline scripts if needed
         })(jQuery);
         </script>
@@ -667,7 +614,8 @@ class AIMT_Admin {
         */
     }
 
-    public function settings_page() {
+    public function settings_page()
+    {
 
         global $wpdb;
         $table_name = $wpdb->prefix . 'aimt_string_translations';
@@ -685,33 +633,33 @@ class AIMT_Admin {
             // 'ar' => 'Arabic'
         );
 
-        $available_source_codes = (array) get_option( 'aimt_default_languages', array() );
-        $available_target_codes = (array) get_option( 'aimt_translation_languages', array() );
+        $available_source_codes = (array) get_option('aimt_default_languages', array());
+        $available_target_codes = (array) get_option('aimt_translation_languages', array());
 
-        if ( ! empty( $available_source_codes ) ) {
-            $source_options = array_intersect_key( $common_languages, array_flip( $available_source_codes ) );
+        if (! empty($available_source_codes)) {
+            $source_options = array_intersect_key($common_languages, array_flip($available_source_codes));
         } else {
             $source_options = $common_languages;
         }
 
-        if ( ! empty( $available_target_codes ) ) {
-            $target_options = array_intersect_key( $common_languages, array_flip( $available_target_codes ) );
+        if (! empty($available_target_codes)) {
+            $target_options = array_intersect_key($common_languages, array_flip($available_target_codes));
         } else {
             $target_options = $common_languages;
         }
 
-        if ( $_SERVER['REQUEST_METHOD'] === 'POST' && current_user_can('manage_options') ) {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && current_user_can('manage_options')) {
 
-            if ( isset($_POST['action']) && $_POST['action'] === 'aimt_add_translation' ) {
-                if ( ! wp_verify_nonce( $_POST['aimt_add_translation_nonce'] ?? '', 'aimt_add_translation' ) ) {
+            if (isset($_POST['action']) && $_POST['action'] === 'aimt_add_translation') {
+                if (! wp_verify_nonce($_POST['aimt_add_translation_nonce'] ?? '', 'aimt_add_translation')) {
                     echo '<div class="notice notice-error"><p>Security check failed.</p></div>';
                 } else {
-                    $string = sanitize_textarea_field( wp_unslash( $_POST['string'] ?? '' ) );
-                    $lang = sanitize_text_field( $_POST['lang'] ?? '' );
-                    $translated_lang = sanitize_text_field( $_POST['translated_lang'] ?? '' );
-                    $translated_string = sanitize_textarea_field( wp_unslash( $_POST['translated_string'] ?? '' ) );
+                    $string = sanitize_textarea_field(wp_unslash($_POST['string'] ?? ''));
+                    $lang = sanitize_text_field($_POST['lang'] ?? '');
+                    $translated_lang = sanitize_text_field($_POST['translated_lang'] ?? '');
+                    $translated_string = sanitize_textarea_field(wp_unslash($_POST['translated_string'] ?? ''));
 
-                    if ( empty( $string ) || empty( $lang ) || empty( $translated_lang ) || empty( $translated_string ) ) {
+                    if (empty($string) || empty($lang) || empty($translated_lang) || empty($translated_string)) {
                         echo '<div class="notice notice-error"><p>Please fill in all fields before adding a translation.</p></div>';
                     } else {
                         $wpdb->insert(
@@ -724,7 +672,7 @@ class AIMT_Admin {
                                 'created_at' => current_time('mysql'),
                                 'updated_at' => current_time('mysql')
                             ),
-                            array( '%s', '%s', '%s', '%s', '%s', '%s' )
+                            array('%s', '%s', '%s', '%s', '%s', '%s')
                         );
 
                         echo '<div class="notice notice-success"><p>Translation added.</p></div>';
@@ -732,18 +680,18 @@ class AIMT_Admin {
                 }
             }
 
-            if ( isset($_POST['action']) && $_POST['action'] === 'aimt_edit_translation' ) {
-                if ( ! wp_verify_nonce( $_POST['aimt_edit_translation_nonce'] ?? '', 'aimt_edit_translation' ) ) {
+            if (isset($_POST['action']) && $_POST['action'] === 'aimt_edit_translation') {
+                if (! wp_verify_nonce($_POST['aimt_edit_translation_nonce'] ?? '', 'aimt_edit_translation')) {
                     echo '<div class="notice notice-error"><p>Security check failed.</p></div>';
                 } else {
-                    $id = intval( $_POST['id'] ?? 0 );
-                    if ( $id > 0 ) {
-                        $string = sanitize_textarea_field( wp_unslash( $_POST['string'] ?? '' ) );
-                        $lang = sanitize_text_field( $_POST['lang'] ?? '' );
-                        $translated_lang = sanitize_text_field( $_POST['translated_lang'] ?? '' );
-                        $translated_string = sanitize_textarea_field( wp_unslash( $_POST['translated_string'] ?? '' ) );
+                    $id = intval($_POST['id'] ?? 0);
+                    if ($id > 0) {
+                        $string = sanitize_textarea_field(wp_unslash($_POST['string'] ?? ''));
+                        $lang = sanitize_text_field($_POST['lang'] ?? '');
+                        $translated_lang = sanitize_text_field($_POST['translated_lang'] ?? '');
+                        $translated_string = sanitize_textarea_field(wp_unslash($_POST['translated_string'] ?? ''));
 
-                        if ( empty( $string ) || empty( $lang ) || empty( $translated_lang ) || empty( $translated_string ) ) {
+                        if (empty($string) || empty($lang) || empty($translated_lang) || empty($translated_string)) {
                             echo '<div class="notice notice-error"><p>Please fill in all fields before updating a translation.</p></div>';
                         } else {
                             $wpdb->update(
@@ -755,9 +703,9 @@ class AIMT_Admin {
                                     'translated_string' => $translated_string,
                                     'updated_at' => current_time('mysql')
                                 ),
-                                array( 'id' => $id ),
-                                array( '%s', '%s', '%s', '%s', '%s' ),
-                                array( '%d' )
+                                array('id' => $id),
+                                array('%s', '%s', '%s', '%s', '%s'),
+                                array('%d')
                             );
 
                             echo '<div class="notice notice-success"><p>Translation updated.</p></div>';
@@ -766,13 +714,13 @@ class AIMT_Admin {
                 }
             }
 
-            if ( isset($_POST['action']) && $_POST['action'] === 'aimt_delete_translation' ) {
-                if ( ! wp_verify_nonce( $_POST['aimt_delete_translation_nonce'] ?? '', 'aimt_delete_translation' ) ) {
+            if (isset($_POST['action']) && $_POST['action'] === 'aimt_delete_translation') {
+                if (! wp_verify_nonce($_POST['aimt_delete_translation_nonce'] ?? '', 'aimt_delete_translation')) {
                     echo '<div class="notice notice-error"><p>Security check failed.</p></div>';
                 } else {
-                    $id = intval( $_POST['id'] ?? 0 );
-                    if ( $id > 0 ) {
-                        $wpdb->delete( $table_name, array( 'id' => $id ), array( '%d' ) );
+                    $id = intval($_POST['id'] ?? 0);
+                    if ($id > 0) {
+                        $wpdb->delete($table_name, array('id' => $id), array('%d'));
                         echo '<div class="notice notice-success"><p>Translation deleted.</p></div>';
                     }
                 }
@@ -780,21 +728,20 @@ class AIMT_Admin {
         }
 
         $edit_row = null;
-        if ( isset($_GET['edit_translation']) ) {
-            $edit_id = intval( $_GET['edit_translation'] );
-            if ( $edit_id > 0 ) {
-                $edit_row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table_name} WHERE id = %d LIMIT 1", $edit_id ), ARRAY_A );
+        if (isset($_GET['edit_translation'])) {
+            $edit_id = intval($_GET['edit_translation']);
+            if ($edit_id > 0) {
+                $edit_row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table_name} WHERE id = %d LIMIT 1", $edit_id), ARRAY_A);
             }
         }
 
-        $translations = $wpdb->get_results( "SELECT * FROM {$table_name} ORDER BY id DESC", ARRAY_A );
+        $translations = $wpdb->get_results("SELECT * FROM {$table_name} ORDER BY id DESC", ARRAY_A);
 
-        $template_path = plugin_dir_path( __FILE__ ) . '../templates/html/settings-page.php';
-        if ( file_exists( $template_path ) ) {
+        $template_path = plugin_dir_path(__FILE__) . '../templates/html/settings-page.php';
+        if (file_exists($template_path)) {
             include $template_path;
         } else {
-            echo '<div class="wrap"><div class="notice notice-error"><p>Settings template not found: ' . esc_html( $template_path ) . '</p></div></div>';
+            echo '<div class="wrap"><div class="notice notice-error"><p>Settings template not found: ' . esc_html($template_path) . '</p></div></div>';
         }
-
     }
 }

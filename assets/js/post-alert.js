@@ -16,7 +16,7 @@ jQuery(document).ready(function ($) {
 
     if (translateNow) {
         alert('User chose to translate the post.');
-        // window.location.href = 'admin.php?page=aimt-onboarding&post_id=' + aimtData.post_id;
+        // window.location.href = 'admin.php?page=aimt-configrations&post_id=' + aimtData.post_id;
     } else {
         console.log('User chose not to translate the post.');
     }
