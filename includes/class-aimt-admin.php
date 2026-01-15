@@ -393,78 +393,127 @@ class AIMT_Admin {
    
 
        $steps = array(
-    'languages' => 'Languages',
-    'register-multilang' => 'Register AI multi language translation',
-    'translation-mode' => 'Translation Mode',
-    'finished' => 'Finished'
-);
+            'languages' => 'Languages',
+            'register-multilang' => 'Register AI multi language translation',
+            'translation-mode' => 'Translation Mode',
+            'finished' => 'Finished'
+        );
 
+        $template_path = plugin_dir_path( __FILE__ ) . '../templates/html/onboarding-page.php';
+        if ( file_exists( $template_path ) ) {
+            include $template_path;
+        } else {
+            echo '<div class="wrap"><div class="notice notice-error"><p>Onboarding template not found: ' . esc_html( $template_path ) . '</p></div></div>';
+        }
+
+        /* 
+       .
         
         ?>
-    <div class="wrap aimt-onboarding">
-      <h1 class="font-poppins text-center main-h">AI multi language translation</h1>
+        <div class="wrap aimt-onboarding">
+          <h1 class="font-poppins text-center main-h">AI multi language translation</h1>
 
-        <div class="container mt-4">
-            <div class="progress mb-5">
-                <?php 
-                $step_count = count($steps);
-                $step_width = 100 / $step_count;
-                $i = 0;
-                foreach ($steps as $key => $label): 
-                    $i++;
-                ?>
-                    <div class="progress-step" style="width: <?php echo $step_width; ?>%">
-                        <div class="step-number <?php echo ($i === 1) ? 'active' : ''; ?>"><?php echo $i; ?></div>
-                        <div class="step-label"><?php echo $label; ?></div>
+            <div class="container mt-4">
+                <div class="progress mb-5">
+                    <?php 
+                    $step_count = count($steps);
+                    $step_width = 100 / $step_count;
+                    $i = 0;
+                    foreach ($steps as $key => $label): 
+                        $i++;
+                    ?>
+                        <div class="progress-step" style="width: <?php echo $step_width; ?>%">
+                            <div class="step-number <?php echo ($i === 1) ? 'active' : ''; ?>"><?php echo $i; ?></div>
+                            <div class="step-label"><?php echo $label; ?></div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <div class="onboarding-steps">
+                    <div class="step-content step-languages active ">
+                        <h2 class="text-center font-poppins">Languages</h2>
+                        <p class="text-center font-poppins">Select the languages you want to support on your website.</p>
+                        
+                            <div class="languages-select mt-4">
+                    <label class="form-label">Default Languages</label>
+
+                    <?php
+                    $common_languages = array(
+                        'English' => 'en',
+                        'Spanish' => 'es',
+                        'French' => 'fr',
+                        'German' => 'de',
+                        'Italian' => 'it',
+                        'Portuguese' => 'pt',
+                        'Chinese' => 'zh',
+                        'Japanese' => 'ja',
+                        'Russian' => 'ru',
+                        'Arabic' => 'ar'
+                    );
+                    ?>
+
+                    <div class="dropdown language-dropdown">
+                        <button
+                            class="btn btn-light border dropdown-toggle btn-first"
+                            type="button"
+                            id="languagesDropdownBtn"
+                            data-toggle="dropdown"
+                            aria-haspopup="true"
+                            aria-expanded="false"
+                        >
+                            English
+                        </button>
+
+                        <div class="dropdown-menu p-2" aria-labelledby="languagesDropdownBtn">
+                            <input
+                                type="text"
+                                class="form-control form-control-sm mb-2 language-search"
+                                placeholder="Search language..."
+                            >
+
+                            <div class="language-options">
+                                <?php foreach ($common_languages as $name => $code): ?>
+                                    <div
+                                        class="dropdown-item language-option"
+                                        data-code="<?php echo esc_attr($code); ?>"
+                                        data-name="<?php echo esc_attr($name); ?>"
+                                    >
+                                        <?php echo esc_html($name); ?> (<?php echo strtoupper($code); ?>)
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
                     </div>
-                <?php endforeach; ?>
-            </div>
-            <div class="onboarding-steps">
-                <div class="step-content step-languages active ">
-                    <h2 class="text-center font-poppins">Languages</h2>
-                    <p class="text-center font-poppins">Select the languages you want to support on your website.</p>
-                    
-                        <div class="languages-select mt-4">
-                <label class="form-label">Default Languages</label>
 
-                <?php
-                $common_languages = array(
-                    'English' => 'en',
-                    'Spanish' => 'es',
-                    'French' => 'fr',
-                    'German' => 'de',
-                    'Italian' => 'it',
-                    'Portuguese' => 'pt',
-                    'Chinese' => 'zh',
-                    'Japanese' => 'ja',
-                    'Russian' => 'ru',
-                    'Arabic' => 'ar'
-                );
-                ?>
+                    <div class="selected-languages"></div>
+                    <small class="form-text text-muted mt-2">
+                        Search and select multiple languages
+                    </small>
+                    <br>
+                <label class="form-label mt-4">Translation Languages</label>
 
-                <div class="dropdown language-dropdown">
+                <div class="dropdown language-dropdown translation-language-dropdown">
                     <button
                         class="btn btn-light border dropdown-toggle btn-first"
                         type="button"
-                        id="languagesDropdownBtn"
+                        id="translationLanguagesDropdownBtn"
                         data-toggle="dropdown"
                         aria-haspopup="true"
                         aria-expanded="false"
                     >
-                        English
+                        Select translation languages
                     </button>
 
-                    <div class="dropdown-menu p-2" aria-labelledby="languagesDropdownBtn">
+                    <div class="dropdown-menu p-2" aria-labelledby="translationLanguagesDropdownBtn">
                         <input
                             type="text"
-                            class="form-control form-control-sm mb-2 language-search"
+                            class="form-control form-control-sm mb-2 translation-language-search"
                             placeholder="Search language..."
                         >
 
-                        <div class="language-options">
+                        <div class="translation-language-options">
                             <?php foreach ($common_languages as $name => $code): ?>
                                 <div
-                                    class="dropdown-item language-option"
+                                    class="dropdown-item translation-language-option"
                                     data-code="<?php echo esc_attr($code); ?>"
                                     data-name="<?php echo esc_attr($name); ?>"
                                 >
@@ -475,269 +524,152 @@ class AIMT_Admin {
                     </div>
                 </div>
 
-                <div class="selected-languages"></div>
-                <small class="form-text text-muted mt-2">
-                    Search and select multiple languages
-                </small>
-                <br>
-            <label class="form-label mt-4">Translation Languages</label>
+                            <?php
+                            $total_posts = 0;
+                            foreach ($post_types as $post_type) {
+                                if ($post_type->name === 'attachment') continue;
+                                $count = wp_count_posts($post_type->name)->publish;
+                                $total_posts += $count;
+                            }
+                            ?>
+                           <label class="form-label mt-2">Select Post Type</label>
 
-            <div class="dropdown language-dropdown translation-language-dropdown">
-                <button
-                    class="btn btn-light border dropdown-toggle btn-first"
-                    type="button"
-                    id="translationLanguagesDropdownBtn"
-                    data-toggle="dropdown"
-                    aria-haspopup="true"
-                    aria-expanded="false"
-                >
-                    Select translation languages
-                </button>
-
-                <div class="dropdown-menu p-2" aria-labelledby="translationLanguagesDropdownBtn">
-                    <input
-                        type="text"
-                        class="form-control form-control-sm mb-2 translation-language-search"
-                        placeholder="Search language..."
-                    >
-
-                    <div class="translation-language-options">
-                        <?php foreach ($common_languages as $name => $code): ?>
-                            <div
-                                class="dropdown-item translation-language-option"
-                                data-code="<?php echo esc_attr($code); ?>"
-                                data-name="<?php echo esc_attr($name); ?>"
-                            >
-                                <?php echo esc_html($name); ?> (<?php echo strtoupper($code); ?>)
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
-
-                        <?php
-                        $total_posts = 0;
-                        foreach ($post_types as $post_type) {
-                            if ($post_type->name === 'attachment') continue;
-                            $count = wp_count_posts($post_type->name)->publish;
-                            $total_posts += $count;
-                        }
-                        ?>
-                       <label class="form-label mt-2">Select Post Type</label>
-
-                            <div class="dropdown language-dropdown post-type-dropdown mb-3">
-                                <button
-                                    class="btn btn-light border dropdown-toggle btn-first"
-                                    type="button"
-                                    id="postTypeDropdownBtn"
-                                    data-toggle="dropdown"
-                                    aria-haspopup="true"
-                                    aria-expanded="false"
-                                >
-                                    Select Post Type
-                                </button>
-
-                                <div class="dropdown-menu p-2" aria-labelledby="postTypeDropdownBtn">
-                                    <input
-                                        type="text"
-                                        class="form-control form-control-sm mb-2 posttype-search"
-                                        placeholder="Search post types..."
+                                <div class="dropdown language-dropdown post-type-dropdown mb-3">
+                                    <button
+                                        class="btn btn-light border dropdown-toggle btn-first"
+                                        type="button"
+                                        id="postTypeDropdownBtn"
+                                        data-toggle="dropdown"
+                                        aria-haspopup="true"
+                                        aria-expanded="false"
                                     >
+                                        Select Post Type
+                                    </button>
 
-                                    <div class="post-type-options">
-                                        <?php foreach ($post_types as $post_type): ?>
-                                            <?php if ($post_type->name === 'attachment') continue; ?>
-                                            <div
-                                                class="dropdown-item post-type-option"
-                                                data-post-type="<?php echo esc_attr($post_type->name); ?>"
-                                                data-name="<?php echo esc_attr($post_type->labels->singular_name); ?>"
-                                            >
-                                                <?php echo esc_html($post_type->labels->singular_name); ?> (<?php echo esc_html($post_type->name); ?>)
-                                            </div>
-                                        <?php endforeach; ?>
+                                    <div class="dropdown-menu p-2" aria-labelledby="postTypeDropdownBtn">
+                                        <input
+                                            type="text"
+                                            class="form-control form-control-sm mb-2 posttype-search"
+                                            placeholder="Search post types..."
+                                        >
+
+                                        <div class="post-type-options">
+                                            <?php foreach ($post_types as $post_type): ?>
+                                                <?php if ($post_type->name === 'attachment') continue; ?>
+                                                <div
+                                                    class="dropdown-item post-type-option"
+                                                    data-post-type="<?php echo esc_attr($post_type->name); ?>"
+                                                    data-name="<?php echo esc_attr($post_type->labels->singular_name); ?>"
+                                                >
+                                                    <?php echo esc_html($post_type->labels->singular_name); ?> (<?php echo esc_html($post_type->name); ?>)
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div class="selected-post-types"></div>
-                            <div class="selected-translation-languages" data-required="true"></div>
-            </div>   
-             
-                            <div class="mt-4">
-                                    <button class="button button-primary next-step btn-next" data-next="register-multilang">Next</button>
-                                </div>
-                            </div>
-                            <div class="step-content step-register-multilang">
-                                <h2>Register AI multi language translation</h2>
-                                <p>Connect your site to AI multi language translation for enhanced multilingual features.</p>
+                                <div class="selected-post-types"></div>
+                                <div class="selected-translation-languages" data-required="true"></div>
+                </div>   
+                 
                                 <div class="mt-4">
-                                    <div class="form-group">
-                                        <label for="wpml_key" class="font-poppins">AI multi language translation Registration Key</label>
-                                        <input type="text" class="form-control" id="wpml_key" name="wpml_key" placeholder="Enter your AI multi language translation key" required>
-                                        <small class="form-text text-muted">Get your key from your AI multi language translation account.</small>
+                                        <button class="button button-primary next-step btn-next" data-next="register-multilang">Next</button>
                                     </div>
                                 </div>
-                                <div class="mt-4">
-                                    <button class="button prev-step" data-prev="languages">Back</button>
-                                    <button class="button button-primary next-step" data-next="translation-mode">Next</button>
+                                <div class="step-content step-register-multilang">
+                                    <h2>Register AI multi language translation</h2>
+                                    <p>Connect your site to AI multi language translation for enhanced multilingual features.</p>
+                                    <div class="mt-4">
+                                        <div class="form-group">
+                                            <label for="wpml_key" class="font-poppins">AI multi language translation Registration Key</label>
+                                            <input type="text" class="form-control" id="wpml_key" name="wpml_key" placeholder="Enter your AI multi language translation key" required>
+                                            <small class="form-text text-muted">Get your key from your AI multi language translation account.</small>
+                                        </div>
+                                    </div>
+                                    <div class="mt-4">
+                                        <button class="button prev-step" data-prev="languages">Back</button>
+                                        <button class="button button-primary next-step" data-next="translation-mode">Next</button>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="step-content step-translation-mode">
-                                <h2>How would you like to translate the content?</h2> 
-                                 <div class="row mt-4">
-                                     <div class="col-md-6 mb-4">
-                                         <div class="card p-4 h-100">
-                                             <h4>Translate Everything Automatically</h4>
-                                             <p class="text-muted">Let AI Multilag do the translating for you</p>
-                                             <ul class="features-list">
-                                                 <li>✓ Translates all your published content automatically</li>
-                                                 <li>✓ Uses machine translation powered by Google, Microsoft, or DeepL</li>
-                                                 <li>✓ Instantly translates new content and updates translations whenever you edit a page or post</li>
-                                                 <li>✓ You can review translations before publishing or hire professional reviewers</li>
-                                                 <li>✓ Affordable and fast</li>
-                                             </ul>
-                                             <button class="button button-primary btn-block choose-mode" data-mode="auto">Choose</button>
+                                <div class="step-content step-translation-mode">
+                                    <h2>How would you like to translate the content?</h2> 
+                                     <div class="row mt-4">
+                                         <div class="col-md-6 mb-4">
+                                             <div class="card p-4 h-100">
+                                                 <h4>Translate Everything Automatically</h4>
+                                                 <p class="text-muted">Let AI Multilag do the translating for you</p>
+                                                 <ul class="features-list">
+                                                     <li>✓ Translates all your published content automatically</li>
+                                                     <li>✓ Uses machine translation powered by Google, Microsoft, or DeepL</li>
+                                                     <li>✓ Instantly translates new content and updates translations whenever you edit a page or post</li>
+                                                     <li>✓ You can review translations before publishing or hire professional reviewers</li>
+                                                     <li>✓ Affordable and fast</li>
+                                                 </ul>
+                                                 <button class="button button-primary btn-block choose-mode" data-mode="auto">Choose</button>
+                                             </div>
+                                         </div>
+                                         
+                                         <div class="col-md-6 mb-4">
+                                             <div class="card p-4 h-100">
+                                                 <h4>Translate What You Choose</h4>
+                                                 <p class="text-muted">You decide what to translate and who'll translate it</p>
+                                                 <ul class="features-list">
+                                                     <li>✓ Translate yourself</li>
+                                                     <li>✓ Use automatic translation on the content you choose</li>
+                                                     <li>✓ Work with translators that are users of your site</li>
+                                                     <li>✓ Send to professional translation services</li>
+                                                 </ul>
+                                                 <button class="button btn-block choose-mode" data-mode="manual">Choose</button>
+                                             </div>
                                          </div>
                                      </div>
                                      
-                                     <div class="col-md-6 mb-4">
-                                         <div class="card p-4 h-100">
-                                             <h4>Translate What You Choose</h4>
-                                             <p class="text-muted">You decide what to translate and who'll translate it</p>
-                                             <ul class="features-list">
-                                                 <li>✓ Translate yourself</li>
-                                                 <li>✓ Use automatic translation on the content you choose</li>
-                                                 <li>✓ Work with translators that are users of your site</li>
-                                                 <li>✓ Send to professional translation services</li>
-                                             </ul>
-                                             <button class="button btn-block choose-mode" data-mode="manual">Choose</button>
-                                         </div>
+                                     <div class="mt-4">
+                                        <button class="button prev-step" data-prev="register-multilang">Back</button>
+                                        <button class="button button-primary next-step" data-next="finished">Next</button>
                                      </div>
                                  </div>
-                                 
-                                 <div class="mt-4">
-                                    <button class="button prev-step" data-prev="register-multilang">Back</button>
-                                    <button class="button button-primary next-step" data-next="finished">Next</button>
-                                 </div>
-                             </div>
 
-                             <!-- <div class="step-content step-support">
-                                <h2>Support</h2>
-                                <p>Select your support preferences.</p>
-                                
-                                <div class="support-options mt-4">
-                                    <div class="form-check mb-3">
-                                        <input style="margin-top:8px"   class="form-check-input" type="checkbox" id="support_docs" checked>
-                                        <label style="margin-left:24px"  class="form-check-label" for="support_docs">
-                                            <strong>Documentation Access</strong><br>
-                                            <small>Get access to comprehensive documentation</small>
-                                        </label>
+                                 <div class="step-content step-finished text-center">
+                                     <h2>🎉 Setup Complete!</h2>
+                                     <p class="lead">Your multilingual site is ready to go!</p>
+                                    
+                                    <div class="success-icon mb-4">
+                                        <span class="dashicons dashicons-yes-alt" style="font-size: 80px; color: #46b450;"></span>
                                     </div>
                                     
-                                    <div class="form-check mb-3">
-                                        <input style="margin-top:8px"  class="form-check-input" type="checkbox" id="support_forum">
-                                        <label style="margin-left: 24px" class="form-check-label" for="support_forum">
-                                            <strong>Forum Support</strong><br>
-                                            <small>Access to community support forums</small>
-                                        </label>
+                                    <div class="summary mt-4 p-4 bg-light rounded">
+                                        <h5>Summary:</h5>
+                                        <p>All settings have been configured successfully.</p>
+                                        <p>You can always modify these settings from the main settings page.</p>
                                     </div>
                                     
-                                    <div class="form-check">
-                                        <input style="margin-top:8px"   class="form-check-input" type="checkbox" id="support_email">
-                                        <label style="margin-left: 24px"  class="form-check-label" for="support_email">
-                                            <strong>Email Support</strong><br>
-                                            <small>Direct email support with our team</small>
-                                        </label>
-                                    </div>
-                                </div>
-                                
-                                <div class="mt-4">
-                                    <button class="button prev-step" data-prev="translation-mode">Back</button>
-                                    <button class="button button-primary next-step" data-next="plugins">Next</button>
-                                </div>
-                            </div> -->
-                            <!-- <div class="step-content step-plugins">
-                                <h2>Recommended Plugins</h2>
-                                <p>Enhance your multilingual site with these recommended plugins.</p>
-                                
-                                <div class="plugins-list mt-4">
-                                    <div class="form-check mb-3">
-                                        <input style="margin-top:8px"   class="form-check-input" type="checkbox" id="plugin_woocommerce" checked>
-                                        <labe style="margin-left:24px"   class="form-check-label" for="plugin_woocommerce">
-                                            <strong>WooCommerce Multilingual</strong><br>
-                                            <small>Translate your WooCommerce products and store</small>
-                                        </label>
-                                    </div>
-                                    
-                                    <div class="form-check mb-3">
-                                        <input style="margin-top:8px"   class="form-check-input" type="checkbox" id="plugin_seo" checked>
-                                        <label style="margin-left: 24px"  class="form-check-label" for="plugin_seo">
-                                            <strong>SEO Pack</strong><br>
-                                            <small>Optimize your multilingual site for search engines</small>
-                                        </label>
-                                    </div>
-                                    
-                                    <div class="form-check mb-3">
-                                        <input style="margin-top:8px"   class="form-check-input" type="checkbox" id="plugin_slug">
-                                        <label style="margin-left: 24px"  class="form-check-label" for="plugin_slug">
-                                            <strong>Slug Translation</strong><br>
-                                            <small>Translate URL slugs for better SEO</small>
-                                        </label>
-                                    </div>
-                                    
-                                    <div class="form-check">
-                                        <input style="margin-top:8px"   class="form-check-input" type="checkbox" id="plugin_media">
-                                        <label style="margin-left: 24px"  class="form-check-label" for="plugin_media">
-                                            <strong>Media Translation</strong><br>
-                                            <small>Translate media captions and alt texts</small>
-                                        </label>
-                                    </div>
-                                </div>
-                                
-                                <div class="mt-4">
-                                    <button class="button prev-step" data-prev="support">Back</button>
-                                    <button class="button button-primary next-step" data-next="finished">Next</button>
-                                </div>
-                            </div> -->
-
-                             <div class="step-content step-finished text-center">
-                                 <h2>🎉 Setup Complete!</h2>
-                                 <p class="lead">Your multilingual site is ready to go!</p>
-                                
-                                <div class="success-icon mb-4">
-                                    <span class="dashicons dashicons-yes-alt" style="font-size: 80px; color: #46b450;"></span>
-                                </div>
-                                
-                                <div class="summary mt-4 p-4 bg-light rounded">
-                                    <h5>Summary:</h5>
-                                    <p>All settings have been configured successfully.</p>
-                                    <p>You can always modify these settings from the main settings page.</p>
-                                </div>
-                                
-                                <div class="mt-4">
-                                    <button class="button prev-step" data-prev="translation-mode">Back</button>
-                                     <a href="<?php echo admin_url('admin.php?page=aimt-settings'); ?>" class="button button-primary">Go to Settings</a>
-                                     <a href="<?php echo home_url(); ?>" class="button" target="_blank">Visit Site</a>
+                                    <div class="mt-4">
+                                        <button class="button prev-step" data-prev="translation-mode">Back</button>
+                                         <a href="<?php echo admin_url('admin.php?page=aimt-settings'); ?>" class="button button-primary">Go to Settings</a>
+                                         <a href="<?php echo home_url(); ?>" class="button" target="_blank">Visit Site</a>
+                                     </div>
                                  </div>
                              </div>
                          </div>
                      </div>
-                 </div>
-                <?php
-                ?>
+                    <?php
+                    ?>
 
-<script type="text/javascript">
-(function($){
-  // Validation is now handled in onboarding.js
-  // Keeping this script block for any future inline scripts if needed
-})(jQuery);
-</script>
+        <script type="text/javascript">
+        (function($){
+          // Validation is now handled in onboarding.js
+          // Keeping this script block for any future inline scripts if needed
+        })(jQuery);
+        </script>
 
-                <?php
-            }
-                public function settings_page() {
+        <?php
+        */
+    }
 
-                    global $wpdb;
+    public function settings_page() {
+
+        global $wpdb;
         $table_name = $wpdb->prefix . 'aimt_string_translations';
 
         $common_languages = array(
@@ -750,7 +682,7 @@ class AIMT_Admin {
             'zh' => 'Chinese',
             'ja' => 'Japanese',
             'ru' => 'Russian',
-            'ar' => 'Arabic'
+            // 'ar' => 'Arabic'
         );
 
         $available_source_codes = (array) get_option( 'aimt_default_languages', array() );
@@ -779,20 +711,24 @@ class AIMT_Admin {
                     $translated_lang = sanitize_text_field( $_POST['translated_lang'] ?? '' );
                     $translated_string = sanitize_textarea_field( wp_unslash( $_POST['translated_string'] ?? '' ) );
 
-                    $wpdb->insert(
-                        $table_name,
-                        array(
-                            'string' => $string,
-                            'lang' => $lang,
-                            'translated_lang' => $translated_lang,
-                            'translated_string' => $translated_string,
-                            'created_at' => current_time('mysql'),
-                            'updated_at' => current_time('mysql')
-                        ),
-                        array( '%s', '%s', '%s', '%s', '%s', '%s' )
-                    );
+                    if ( empty( $string ) || empty( $lang ) || empty( $translated_lang ) || empty( $translated_string ) ) {
+                        echo '<div class="notice notice-error"><p>Please fill in all fields before adding a translation.</p></div>';
+                    } else {
+                        $wpdb->insert(
+                            $table_name,
+                            array(
+                                'string' => $string,
+                                'lang' => $lang,
+                                'translated_lang' => $translated_lang,
+                                'translated_string' => $translated_string,
+                                'created_at' => current_time('mysql'),
+                                'updated_at' => current_time('mysql')
+                            ),
+                            array( '%s', '%s', '%s', '%s', '%s', '%s' )
+                        );
 
-                    echo '<div class="notice notice-success"><p>Translation added.</p></div>';
+                        echo '<div class="notice notice-success"><p>Translation added.</p></div>';
+                    }
                 }
             }
 
@@ -807,21 +743,25 @@ class AIMT_Admin {
                         $translated_lang = sanitize_text_field( $_POST['translated_lang'] ?? '' );
                         $translated_string = sanitize_textarea_field( wp_unslash( $_POST['translated_string'] ?? '' ) );
 
-                        $wpdb->update(
-                            $table_name,
-                            array(
-                                'string' => $string,
-                                'lang' => $lang,
-                                'translated_lang' => $translated_lang,
-                                'translated_string' => $translated_string,
-                                'updated_at' => current_time('mysql')
-                            ),
-                            array( 'id' => $id ),
-                            array( '%s', '%s', '%s', '%s', '%s' ),
-                            array( '%d' )
-                        );
+                        if ( empty( $string ) || empty( $lang ) || empty( $translated_lang ) || empty( $translated_string ) ) {
+                            echo '<div class="notice notice-error"><p>Please fill in all fields before updating a translation.</p></div>';
+                        } else {
+                            $wpdb->update(
+                                $table_name,
+                                array(
+                                    'string' => $string,
+                                    'lang' => $lang,
+                                    'translated_lang' => $translated_lang,
+                                    'translated_string' => $translated_string,
+                                    'updated_at' => current_time('mysql')
+                                ),
+                                array( 'id' => $id ),
+                                array( '%s', '%s', '%s', '%s', '%s' ),
+                                array( '%d' )
+                            );
 
-                        echo '<div class="notice notice-success"><p>Translation updated.</p></div>';
+                            echo '<div class="notice notice-success"><p>Translation updated.</p></div>';
+                        }
                     }
                 }
             }
@@ -849,212 +789,12 @@ class AIMT_Admin {
 
         $translations = $wpdb->get_results( "SELECT * FROM {$table_name} ORDER BY id DESC", ARRAY_A );
 
-        ?>
-        <div class="wrap aimt-settings-page">
-            <div class="aimt-settings-header">
-                <div class="aimt-settings-header-content">
-                    <h1>AI Multi-Language Translation</h1>
-                    <p class="aimt-subtitle">Manage string-level translations stored by the plugin.</p>
-                </div>
-            </div>
+        $template_path = plugin_dir_path( __FILE__ ) . '../templates/html/settings-page.php';
+        if ( file_exists( $template_path ) ) {
+            include $template_path;
+        } else {
+            echo '<div class="wrap"><div class="notice notice-error"><p>Settings template not found: ' . esc_html( $template_path ) . '</p></div></div>';
+        }
 
-            <div class="aimt-settings-container">
-                <div class="aimt-form-panel">
-                    <div class="aimt-form-card">
-                        <div class="aimt-form-header">
-                            <?php if ( $edit_row ): ?>
-                                <h2>Edit Translation</h2>
-                                <span class="aimt-form-id">#<?php echo esc_html( $edit_row['id'] ); ?></span>
-                            <?php else: ?>
-                                <h2>Add New Translation</h2>
-                            <?php endif; ?>
-                        </div>
-                        <p class="aimt-form-subtitle">
-                            Create or update a translation entry. These values are used when rendering multilingual strings on your site.
-                        </p>
-
-                        <div class="aimt-form">
-                            <?php if ( $edit_row ): ?>
-                                <form method="post">
-                                    <?php wp_nonce_field('aimt_edit_translation', 'aimt_edit_translation_nonce'); ?>
-                                    <input type="hidden" name="action" value="aimt_edit_translation">
-                                    <input type="hidden" name="id" value="<?php echo esc_attr($edit_row['id']); ?>">
-
-                                    <div class="aimt-form-group">
-                                        <label class="aimt-form-label">Original string (source)</label>
-                                        <textarea name="string" rows="3" class="aimt-form-control"><?php echo esc_textarea($edit_row['string']); ?></textarea>
-                                    </div>
-
-                                    <div class="aimt-form-row">
-                                        <div class="aimt-form-group">
-                                            <label class="aimt-form-label">Source language</label>
-                                            <select name="lang" class="aimt-form-control">
-                                                <?php foreach ( $source_options as $code => $label ): ?>
-                                                    <option value="<?php echo esc_attr( $code ); ?>" <?php selected( $edit_row['lang'] ?? '', $code ); ?>>
-                                                        <?php echo esc_html( "{$label} ({$code})" ); ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                        <div class="aimt-form-group">
-                                            <label class="aimt-form-label">Translated language</label>
-                                            <select name="translated_lang" class="aimt-form-control">
-                                                <?php foreach ( $target_options as $code => $label ): ?>
-                                                    <option value="<?php echo esc_attr( $code ); ?>" <?php selected( $edit_row['translated_lang'] ?? '', $code ); ?>>
-                                                        <?php echo esc_html( "{$label} ({$code})" ); ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div class="aimt-form-group">
-                                        <label class="aimt-form-label">Translated string</label>
-                                        <textarea name="translated_string" rows="3" class="aimt-form-control"><?php echo esc_textarea($edit_row['translated_string']); ?></textarea>
-                                    </div>
-
-                                    <div class="aimt-form-actions">
-                                        <button type="submit" class="button button-primary aimt-btn-primary">Save Translation</button>
-                                        <a class="button aimt-btn-secondary" href="<?php echo admin_url('admin.php?page=aimt-settings'); ?>">Cancel</a>
-                                    </div>
-                                </form>
-                            <?php else: ?>
-                                <form method="post">
-                                    <?php wp_nonce_field('aimt_add_translation', 'aimt_add_translation_nonce'); ?>
-                                    <input type="hidden" name="action" value="aimt_add_translation">
-
-                                    <div class="aimt-form-group">
-                                        <label class="aimt-form-label">Original string (source)</label>
-                                        <textarea name="string" rows="3" class="aimt-form-control"><?php echo isset($_POST['string']) ? esc_textarea($_POST['string']) : ''; ?></textarea>
-                                    </div>
-
-                                    <div class="aimt-form-row">
-                                        <div class="aimt-form-group">
-                                            <label class="aimt-form-label">Source language</label>
-                                            <select name="lang" class="aimt-form-control">
-                                                <?php foreach ( $source_options as $code => $label ): ?>
-                                                    <option value="<?php echo esc_attr( $code ); ?>"><?php echo esc_html( "{$label} ({$code})" ); ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                        <div class="aimt-form-group">
-                                            <label class="aimt-form-label">Translated language</label>
-                                            <select name="translated_lang" class="aimt-form-control">
-                                                <?php foreach ( $target_options as $code => $label ): ?>
-                                                    <option value="<?php echo esc_attr( $code ); ?>"><?php echo esc_html( "{$label} ({$code})" ); ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div class="aimt-form-group">
-                                        <label class="aimt-form-label">Translated string</label>
-                                        <textarea name="translated_string" rows="3" class="aimt-form-control"><?php echo isset($_POST['translated_string']) ? esc_textarea($_POST['translated_string']) : ''; ?></textarea>
-                                    </div>
-
-                                    <div class="aimt-form-actions">
-                                        <button type="submit" class="button button-primary aimt-btn-primary">Add Translation</button>
-                                    </div>
-                                </form>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="aimt-info-panel">
-                    <div class="aimt-info-card">
-                        <div class="aimt-info-header">
-                            <h3>Notes</h3>
-                        </div>
-                        <div class="aimt-info-content">
-                            <div class="aimt-info-section">
-                                <p class="aimt-info-text">
-                                    Translations are stored in the
-                                    <span class="aimt-code"><?php echo esc_html( $table_name ); ?></span>
-                                    table.
-                                </p>
-                            </div>
-                            <div class="aimt-info-section">
-                                <p class="aimt-info-text">
-                                    You can edit or delete existing entries from the table below.
-                                </p>
-                            </div>
-                            <div class="aimt-info-section">
-                                <p class="aimt-info-text">
-                                    Changes here take effect immediately wherever these strings are rendered.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="aimt-table-section">
-                <div class="aimt-table-header">
-                    <h2>All Translations</h2>
-                    <span class="aimt-table-count">
-                        <?php echo intval( count( $translations ) ); ?> entries
-                    </span>
-                </div>
-                <div class="aimt-table-wrapper">
-                    <table class="widefat fixed striped aimt-table">
-                        <thead>
-                            <tr>
-                                <th class="aimt-col-id">ID</th>
-                                <th>Original String</th>
-                                <th class="aimt-col-source">Source (code)</th>
-                                <th class="aimt-col-target">Target (code)</th>
-                                <th>Translated String</th>
-                                <th class="aimt-col-created">Created</th>
-                                <th class="aimt-col-updated">Updated</th>
-                                <th class="aimt-col-actions">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if ( ! empty( $translations ) ): ?>
-                                <?php foreach ( $translations as $row ): ?>
-                                    <tr>
-                                        <td><?php echo esc_html( $row['id'] ); ?></td>
-                                        <td><?php echo esc_html( $row['string'] ); ?></td>
-                                        <td>
-                                            <span class="aimt-badge aimt-badge-code">
-                                                <?php echo esc_html( $row['lang'] ); ?>
-                                            </span>
-                                            <span class="aimt-badge-label">
-                                                <?php echo esc_html( $common_languages[ $row['lang'] ] ?? '' ); ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span class="aimt-badge aimt-badge-code">
-                                                <?php echo esc_html( $row['translated_lang'] ); ?>
-                                            </span>
-                                            <span class="aimt-badge-label">
-                                                <?php echo esc_html( $common_languages[ $row['translated_lang'] ] ?? '' ); ?>
-                                            </span>
-                                        </td>
-                                        <td><?php echo esc_html( $row['translated_string'] ); ?></td>
-                                        <td><?php echo esc_html( $row['created_at'] ); ?></td>
-                                        <td><?php echo esc_html( $row['updated_at'] ); ?></td>
-                                        <td>
-                                            <a class="button aimt-btn-edit" href="<?php echo esc_url( add_query_arg( 'edit_translation', intval($row['id']), admin_url('admin.php?page=aimt-settings') ) ); ?>">Edit</a>
-                                            <form method="post" style="display:inline-block;margin:0 0 0 6px;" onsubmit="return confirm('Delete translation #<?php echo esc_attr($row['id']); ?>?');">
-                                                <?php wp_nonce_field('aimt_delete_translation', 'aimt_delete_translation_nonce'); ?>
-                                                <input type="hidden" name="action" value="aimt_delete_translation">
-                                                <input type="hidden" name="id" value="<?php echo esc_attr($row['id']); ?>">
-                                                <input type="submit" class="button button-secondary aimt-btn-delete" value="Delete">
-                                            </form>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr><td colspan="8">No translations found.</td></tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-        </div>
-        <?php
     }
 }
