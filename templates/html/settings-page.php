@@ -33,7 +33,7 @@
 
                             <div class="aimt-form-group">
                                 <label class="aimt-form-label">Original string (source)</label>
-                                <textarea name="string" rows="3"
+                                <textarea name="string" rows="3" required
                                     class="aimt-form-control"><?php echo esc_textarea($edit_row['string']); ?></textarea>
                             </div>
 
@@ -120,102 +120,78 @@
                 </div>
             </div>
         </div>
+    </div>
 
-        <div class="aimt-info-panel">
-            <div class="aimt-info-card">
-                <div class="aimt-info-header">
-                    <h3>Notes</h3>
+    { 
+        <div class="aimt-table-container">
+            <div class="aimt-table-section">
+                <div class="aimt-table-header">
+                    <h2>All Translations</h2>
+                    <span class="aimt-table-count">
+                        <?php echo intval(count($translations)); ?> entries
+                    </span>
                 </div>
-                <div class="aimt-info-content">
-                    <div class="aimt-info-section">
-                        <p class="aimt-info-text">
-                            Translations are stored in the
-                            <span class="aimt-code"><?php echo esc_html($table_name); ?></span>
-                            table.
-                        </p>
-                    </div>
-                    <div class="aimt-info-section">
-                        <p class="aimt-info-text">
-                            You can edit or delete existing entries from the table below.
-                        </p>
-                    </div>
-                    <div class="aimt-info-section">
-                        <p class="aimt-info-text">
-                            Changes here take effect immediately wherever these strings are rendered.
-                        </p>
-                    </div>
+                <div class="aimt-table-wrapper">
+                    <table class="widefat fixed striped aimt-table">
+                        <thead>
+                            <tr>
+                                <th class="aimt-col-id">ID</th>
+                                <th>Original String</th>
+                                <th class="aimt-col-source">Source (code)</th>
+                                <th class="aimt-col-target">Target (code)</th>
+                                <th>Translated String</th>
+                                <th class="aimt-col-created">Created</th>
+                                <th class="aimt-col-updated">Updated</th>
+                                <th class="aimt-col-actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($translations)): ?>
+                                <?php foreach ($translations as $row): ?>
+                                    <tr>
+                                        <td><?php echo esc_html($row['id']); ?></td>
+                                        <td><?php echo esc_html($row['string']); ?></td>
+                                        <td>
+                                            <span class="aimt-badge aimt-badge-code">
+                                                <?php echo esc_html($row['lang']); ?>
+                                            </span>
+                                            <span class="aimt-badge-label">
+                                                <?php echo esc_html($common_languages[$row['lang']] ?? ''); ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="aimt-badge aimt-badge-code">
+                                                <?php echo esc_html($row['translated_lang']); ?>
+                                            </span>
+                                            <span class="aimt-badge-label">
+                                                <?php echo esc_html($common_languages[$row['translated_lang']] ?? ''); ?>
+                                            </span>
+                                        </td>
+                                        <td><?php echo esc_html($row['translated_string']); ?></td>
+                                        <td><?php echo esc_html($row['created_at']); ?></td>
+                                        <td><?php echo esc_html($row['updated_at']); ?></td>
+                                        <td>
+                                            <a class="button aimt-btn-edit"
+                                                href="<?php echo esc_url(add_query_arg('edit_translation', intval($row['id']), admin_url('admin.php?page=aimt-settings'))); ?>">Edit</a>
+                                            <form method="post" style="display:inline-block;margin:0 0 0 6px;"
+                                                onsubmit="return confirm('Delete translation #<?php echo esc_attr($row['id']); ?>?');">
+                                                <?php wp_nonce_field('aimt_delete_translation', 'aimt_delete_translation_nonce'); ?>
+                                                <input type="hidden" name="action" value="aimt_delete_translation">
+                                                <input type="hidden" name="id" value="<?php echo esc_attr($row['id']); ?>">
+                                                <input type="submit" class="button button-secondary aimt-btn-delete" value="Delete">
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="8">No translations found.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="aimt-table-section">
-        <div class="aimt-table-header">
-            <h2>All Translations</h2>
-            <span class="aimt-table-count">
-                <?php echo intval(count($translations)); ?> entries
-            </span>
-        </div>
-        <div class="aimt-table-wrapper">
-            <table class="widefat fixed striped aimt-table">
-                <thead>
-                    <tr>
-                        <th class="aimt-col-id">ID</th>
-                        <th>Original String</th>
-                        <th class="aimt-col-source">Source (code)</th>
-                        <th class="aimt-col-target">Target (code)</th>
-                        <th>Translated String</th>
-                        <th class="aimt-col-created">Created</th>
-                        <th class="aimt-col-updated">Updated</th>
-                        <th class="aimt-col-actions">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($translations)): ?>
-                        <?php foreach ($translations as $row): ?>
-                            <tr>
-                                <td><?php echo esc_html($row['id']); ?></td>
-                                <td><?php echo esc_html($row['string']); ?></td>
-                                <td>
-                                    <span class="aimt-badge aimt-badge-code">
-                                        <?php echo esc_html($row['lang']); ?>
-                                    </span>
-                                    <span class="aimt-badge-label">
-                                        <?php echo esc_html($common_languages[$row['lang']] ?? ''); ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <span class="aimt-badge aimt-badge-code">
-                                        <?php echo esc_html($row['translated_lang']); ?>
-                                    </span>
-                                    <span class="aimt-badge-label">
-                                        <?php echo esc_html($common_languages[$row['translated_lang']] ?? ''); ?>
-                                    </span>
-                                </td>
-                                <td><?php echo esc_html($row['translated_string']); ?></td>
-                                <td><?php echo esc_html($row['created_at']); ?></td>
-                                <td><?php echo esc_html($row['updated_at']); ?></td>
-                                <td>
-                                    <a class="button aimt-btn-edit"
-                                        href="<?php echo esc_url(add_query_arg('edit_translation', intval($row['id']), admin_url('admin.php?page=aimt-settings'))); ?>">Edit</a>
-                                    <form method="post" style="display:inline-block;margin:0 0 0 6px;"
-                                        onsubmit="return confirm('Delete translation #<?php echo esc_attr($row['id']); ?>?');">
-                                        <?php wp_nonce_field('aimt_delete_translation', 'aimt_delete_translation_nonce'); ?>
-                                        <input type="hidden" name="action" value="aimt_delete_translation">
-                                        <input type="hidden" name="id" value="<?php echo esc_attr($row['id']); ?>">
-                                        <input type="submit" class="button button-secondary aimt-btn-delete" value="Delete">
-                                    </form>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr>
-                            <td colspan="8">No translations found.</td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
+    }
 </div>

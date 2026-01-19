@@ -29,11 +29,13 @@ jQuery(document).ready(function ($) {
   function summaryHtmlForState(s) {
     const dl = [];
     dl.push(
-      `<strong>Default:</strong> ${Object.values(s.selectedLanguages || {}).join(", ") || "—"
+      `<strong>Default:</strong> ${
+        Object.values(s.selectedLanguages || {}).join(", ") || "—"
       }`
     );
     dl.push(
-      `<strong>Translation:</strong> ${Object.values(s.translationLanguages || {}).join(", ") || "—"
+      `<strong>Translation:</strong> ${
+        Object.values(s.translationLanguages || {}).join(", ") || "—"
       }`
     );
     dl.push(`<strong>Post Type:</strong> ${s.postType || "—"}`);
@@ -44,6 +46,9 @@ jQuery(document).ready(function ($) {
       .map((i) => `<div>${i}</div>`)
       .join("")}</div>`;
   }
+
+
+  
 
   function showStoredAlert() {
     if ($(".aimt-stored-alert").length) return;
@@ -469,6 +474,20 @@ jQuery(document).ready(function ($) {
     });
   });
 
+  $(document).on("keyup", ".posttype-search", function () {
+    const value = $(this).val().toLowerCase().trim();
+    $(".post-type-option").each(function () {
+      const label = (
+        $(this).data("name") ||
+        $(this).text() ||
+        ""
+      ).toLowerCase();
+      const slug = ($(this).data("post-type") || "").toLowerCase();
+      const hay = (label + " " + slug).replace(/\s+/g, " ");
+      $(this).toggle(hay.indexOf(value) !== -1);
+    });
+  });
+
   if (!state.postTypes) {
     state.postTypes = {};
     if (state.postType) {
@@ -549,7 +568,7 @@ jQuery(document).ready(function ($) {
 
   try {
     renderSelectedPostTypes();
-  } catch (e) { }
+  } catch (e) {}
 
   $(document).on("change", 'input[name="url_format"]', function () {
     state.urlFormat = $(this).val();
@@ -613,8 +632,7 @@ jQuery(document).ready(function ($) {
       }
 
       const hasPostType =
-        state.postTypes &&
-        Object.keys(state.postTypes).length > 0;
+        state.postTypes && Object.keys(state.postTypes).length > 0;
       if (!hasPostType) {
         alert("Please select a post type.");
         return false;
@@ -623,7 +641,9 @@ jQuery(document).ready(function ($) {
 
     if (next === "translation-mode") {
       if (!state.wpmlKey || !state.wpmlKey.trim()) {
-        alert("Please enter your AI multi language translation registration key.");
+        alert(
+          "Please enter your AI multi language translation registration key."
+        );
         return false;
       }
     }
