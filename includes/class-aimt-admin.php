@@ -2,18 +2,24 @@
 
 class AIMT_Admin
 {
+
     public function __construct()
     {
-        add_action('admin_menu', array($this, 'register_menu'));
-        add_action('admin_enqueue_scripts', array($this, 'assets'));
-        add_action('save_post', array($this, 'aimt_show_alert_on_post_save'), 10, 3);
-        add_action('save_post', array($this, 'aimt_process_translation_options'), 20, 3);
-        add_action('wp_ajax_aimt_clear_alert_flag', array($this, 'aimt_clear_alert_flag'));
-        add_action('wp_ajax_aimt_save_onboarding', array($this, 'save_onboarding_state'));
-        add_action('wp_ajax_aimt_load_onboarding', array($this, 'load_onboarding_state'));
-        add_action('wp_ajax_aimt_clear_configration', array($this, 'clear_onboarding_state'));
+        add_action('admin_menu', [$this, 'register_menu']);
+        add_action('admin_enqueue_scripts', [$this, 'assets']);
+        add_action('save_post', [$this, 'aimt_show_alert_on_post_save'], 10, 3);
+        add_action('save_post', [$this, 'aimt_process_translation_options'], 20, 3);
+        add_action('wp_ajax_aimt_clear_alert_flag', [$this, 'aimt_clear_alert_flag']);
+        add_action('wp_ajax_aimt_save_onboarding', [$this, 'save_onboarding_state']);
+        add_action('wp_ajax_aimt_load_onboarding', [$this, 'load_onboarding_state']);
+        add_action('wp_ajax_aimt_clear_configration', [$this, 'clear_onboarding_state']);
 
-        add_action('add_meta_boxes', array($this, 'register_translation_metabox'));
+        add_action('add_meta_boxes', [$this, 'register_translation_metabox']);
+        add_action('elementor/editor/after_save', function ($post_id) {
+            $nodes = $this->aimt_get_elementor_text_nodes($post_id);
+            update_post_meta($post_id, '_aimt_elementor_debug', $nodes);
+        });
+
     }
 
     // public function aimt_show_alert_on_post_save($post_id, $post, $update)
@@ -30,6 +36,95 @@ class AIMT_Admin
     //     update_post_meta($post_id, '_aimt_show_alert', 1);
     // }
 
+    private $raw_elementor_data     = null;
+    private $decoded_elementor_data = null;
+    private function aimt_get_elementor_text_nodes($post_id)
+    {
+        $json = get_post_meta($post_id, '_elementor_data', true);
+
+        $this->raw_elementor_data = $json;
+
+        if (empty($json)) {
+            $this->decoded_elementor_data = [];
+            return [];
+        }
+
+        $data = json_decode($json, true);
+
+        $this->decoded_elementor_data = is_array($data) ? $data : [];
+
+        if (! is_array($data)) {
+            return [];
+        }
+
+        $results = [];
+        $this->aimt_walk_elementor_elements($data, $results);
+
+        return $results;
+    }
+
+    private function aimt_walk_elementor_elements($elements, &$results)
+    {
+        if (empty($elements)) {
+            return;
+        }
+
+        if (is_string($elements)) {
+            $decoded = json_decode($elements, true);
+            if (is_array($decoded)) {
+                $elements = $decoded;
+            } else {
+                return;
+            }
+        }
+
+        if (! is_array($elements)) {
+            return;
+        }
+
+        foreach ($elements as $el) {
+            if (! is_array($el)) {
+                continue;
+            }
+
+            // Common text-containing settings
+            if (isset($el['settings']) && is_array($el['settings'])) {
+                foreach ($el['settings'] as $key => $val) {
+                    if (! is_string($val)) {
+                        continue;
+                    }
+                    if (in_array($key, ['text', 'editor', 'title', 'subtitle', 'sub_title', 'description', 'content', 'button_text'], true)) {
+                        $results[] = [
+                            'key'     => $key,
+                            'text'    => $val,
+                            'el_type' => $el['el_type'] ?? null,
+                        ];
+                    }
+                }
+            }
+
+            // Capture direct HTML or template text
+            foreach (['html', 'template'] as $k) {
+                if (isset($el[$k]) && is_string($el[$k])) {
+                    $results[] = ['key' => $k, 'text' => $el[$k], 'el_type' => $el['el_type'] ?? null];
+                }
+            }
+
+            // Recurse into common child keys
+            $child_keys = ['elements', 'widgets', 'inner', 'columns', 'inner_elements', 'items'];
+            foreach ($child_keys as $ck) {
+                if (isset($el[$ck]) && ! empty($el[$ck])) {
+                    $this->aimt_walk_elementor_elements($el[$ck], $results);
+                }
+            }
+
+            // Some nested structures use 'elements' under a container
+            if (isset($el['elements']) && is_array($el['elements'])) {
+                $this->aimt_walk_elementor_elements($el['elements'], $results);
+            }
+        }
+    }
+
     public function register_translation_metabox()
     {
         $post_types = $this->get_configured_post_type_slugs();
@@ -37,7 +132,7 @@ class AIMT_Admin
             add_meta_box(
                 'aimt-translation-box',
                 __('AI Translation', 'aimt'),
-                array($this, 'render_translation_metabox'),
+                [$this, 'render_translation_metabox'],
                 $pt,
                 'side',
                 'high'
@@ -47,19 +142,25 @@ class AIMT_Admin
 
     public function aimt_show_alert_on_post_save($post_id, $post, $update)
     {
-        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE)
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
             return;
-        if (wp_is_post_revision($post_id))
-            return;
-        if (!is_admin())
-            return;
-        $selected_raw = (array) get_option('aimt_selected_post_types', array());
-        if (empty($selected_raw)) {
-            $selected_raw = (array) get_option('aimt_translatable_post_types', array());
         }
 
-        $registered = get_post_types(array(), 'objects');
-        $allowed = array();
+        if (wp_is_post_revision($post_id)) {
+            return;
+        }
+
+        if (! is_admin()) {
+            return;
+        }
+
+        $selected_raw = (array) get_option('aimt_selected_post_types', []);
+        if (empty($selected_raw)) {
+            $selected_raw = (array) get_option('aimt_translatable_post_types', []);
+        }
+
+        $registered = get_post_types([], 'objects');
+        $allowed    = [];
 
         foreach ($selected_raw as $v) {
             $v = sanitize_text_field($v);
@@ -83,42 +184,59 @@ class AIMT_Admin
 
         $allowed = array_values(array_unique(array_filter($allowed)));
         if (empty($allowed)) {
-            $allowed = array('post', 'page');
+            $allowed = ['post', 'page'];
         }
-        
-        if (!in_array('page', $allowed, true)) {
+
+        if (! in_array('page', $allowed, true)) {
             $allowed[] = 'page';
         }
 
-        if (!in_array($post->post_type, $allowed, true))
+        if (! in_array($post->post_type, $allowed, true)) {
             return;
-        if (!isset($post->post_status) || !in_array($post->post_status, array('draft', 'publish'), true))
+        }
+
+        if (! isset($post->post_status) || ! in_array($post->post_status, ['draft', 'publish'], true)) {
             return;
+        }
 
         update_post_meta($post_id, '_aimt_show_alert', 1);
+
+        if (function_exists('get_post_meta')) {
+            $nodes = $this->aimt_get_elementor_text_nodes($post_id);
+            if (! empty($nodes)) {
+                update_post_meta($post_id, '_aimt_elementor_debug', $nodes);
+            } else {
+                update_post_meta($post_id, '_aimt_elementor_debug', []);
+            }
+        }
     }
 
-  
     public function aimt_process_translation_options($post_id, $post, $update)
     {
-        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE)
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
             return;
-        if (wp_is_post_revision($post_id))
-            return;
-        if (!is_admin())
-            return;
+        }
 
-        if (!current_user_can('edit_post', $post_id))
+        if (wp_is_post_revision($post_id)) {
             return;
+        }
 
-        if (!isset($_POST['aimt_translation_options']) || empty($_POST['aimt_translation_options'])) {
+        if (! is_admin()) {
+            return;
+        }
+
+        if (! current_user_can('edit_post', $post_id)) {
+            return;
+        }
+
+        if (! isset($_POST['aimt_translation_options']) || empty($_POST['aimt_translation_options'])) {
             return;
         }
 
         $languages_json = sanitize_text_field($_POST['aimt_translation_options']);
-        $languages = json_decode($languages_json, true);
+        $languages      = json_decode($languages_json, true);
 
-        if (!is_array($languages) || empty($languages)) {
+        if (! is_array($languages) || empty($languages)) {
             return;
         }
 
@@ -127,19 +245,20 @@ class AIMT_Admin
         update_post_meta($post_id, '_aimt_translation_timestamp', time());
 
         $post_content = $post->post_content;
-        $post_title = $post->post_title;
+        $post_title   = $post->post_title;
         $post_excerpt = $post->post_excerpt;
 
-        $source_language = get_option('aimt_default_languages', array('en'));
-        $source_language = is_array($source_language) && !empty($source_language) ? $source_language[0] : 'en';
+        $source_language = get_option('aimt_default_languages', ['en']);
+        $source_language = is_array($source_language) && ! empty($source_language) ? $source_language[0] : 'en';
 
         global $wpdb;
         $table_name = $wpdb->prefix . 'aimt_translations';
 
         foreach ($languages as $target_lang) {
             $target_lang = sanitize_text_field($target_lang);
-            if (empty($target_lang))
+            if (empty($target_lang)) {
                 continue;
+            }
 
             $existing = $wpdb->get_var($wpdb->prepare(
                 "SELECT id FROM $table_name WHERE post_id=%d AND language_code=%s",
@@ -147,36 +266,36 @@ class AIMT_Admin
                 $target_lang
             ));
 
-            $translation_text = $this->aimt_translate_content($post_content, $source_language, $target_lang);
-            $translation_title = $this->aimt_translate_content($post_title, $source_language, $target_lang);
-            $translation_excerpt = !empty($post_excerpt) ? $this->aimt_translate_content($post_excerpt, $source_language, $target_lang) : '';
+            $translation_text    = $this->aimt_translate_content($post_content, $source_language, $target_lang);
+            $translation_title   = $this->aimt_translate_content($post_title, $source_language, $target_lang);
+            $translation_excerpt = ! empty($post_excerpt) ? $this->aimt_translate_content($post_excerpt, $source_language, $target_lang) : '';
 
-            $translation_data = array(
-                'title' => $translation_title,
-                'content' => $translation_text,
-                'excerpt' => $translation_excerpt,
-                'source_lang' => $source_language,
-                'target_lang' => $target_lang,
-                'translated_at' => current_time('mysql')
-            );
+            $translation_data = [
+                'title'         => $translation_title,
+                'content'       => $translation_text,
+                'excerpt'       => $translation_excerpt,
+                'source_lang'   => $source_language,
+                'target_lang'   => $target_lang,
+                'translated_at' => current_time('mysql'),
+            ];
 
             if ($existing) {
                 $wpdb->update(
                     $table_name,
-                    array('translation_text' => json_encode($translation_data)),
-                    array('id' => $existing),
-                    array('%s'),
-                    array('%d')
+                    ['translation_text' => json_encode($translation_data)],
+                    ['id' => $existing],
+                    ['%s'],
+                    ['%d']
                 );
             } else {
                 $wpdb->insert(
                     $table_name,
-                    array(
-                        'post_id' => $post_id,
-                        'language_code' => $target_lang,
-                        'translation_text' => json_encode($translation_data)
-                    ),
-                    array('%d', '%s', '%s')
+                    [
+                        'post_id'          => $post_id,
+                        'language_code'    => $target_lang,
+                        'translation_text' => json_encode($translation_data),
+                    ],
+                    ['%d', '%s', '%s']
                 );
             }
         }
@@ -184,7 +303,6 @@ class AIMT_Admin
         delete_post_meta($post_id, '_aimt_pending_translations');
     }
 
-  
     private function aimt_translate_content($content, $source_lang, $target_lang)
     {
         if (empty($content)) {
@@ -197,7 +315,7 @@ class AIMT_Admin
         }
 
         // Get API configuration
-        $api_key = get_option('aimt_api_key', '');
+        $api_key          = get_option('aimt_api_key', '');
         $translation_mode = get_option('aimt_translation_mode', '');
 
         // TODO: Implement actual translation API call here
@@ -230,7 +348,7 @@ class AIMT_Admin
         // TODO: Replace this with actual API call when translation service is configured
         // The structure below shows how to implement the API call
 
-        if (!empty($api_key) && !empty($translation_mode)) {
+        if (! empty($api_key) && ! empty($translation_mode)) {
             // API is configured - implement translation call here
             // Example structure (uncomment and configure for your API):
 
@@ -257,18 +375,17 @@ class AIMT_Admin
              */
         }
 
-        
         return $content;
     }
 
     public function render_translation_metabox($post)
     {
-        if (!current_user_can('edit_post', $post->ID)) {
+        if (! current_user_can('edit_post', $post->ID)) {
             return;
         }
 
         $status = $post->post_status ?? '';
-        if (!in_array($status, array('draft', 'publish'), true)) {
+        if (! in_array($status, ['draft', 'publish'], true)) {
             echo '<p>' . esc_html__('Translation becomes available after saving a Draft or Publishing.', 'aimt') . '</p>';
             return;
         }
@@ -288,13 +405,13 @@ class AIMT_Admin
 
     private function get_configured_post_type_slugs()
     {
-        $selected_raw = (array) get_option('aimt_selected_post_types', array());
+        $selected_raw = (array) get_option('aimt_selected_post_types', []);
         if (empty($selected_raw)) {
-            $selected_raw = (array) get_option('aimt_translatable_post_types', array());
+            $selected_raw = (array) get_option('aimt_translatable_post_types', []);
         }
 
-        $registered = get_post_types(array(), 'objects');
-        $allowed = array();
+        $registered = get_post_types([], 'objects');
+        $allowed    = [];
 
         foreach ($selected_raw as $v) {
             $v = sanitize_text_field($v);
@@ -320,10 +437,10 @@ class AIMT_Admin
 
         $allowed = array_values(array_unique(array_filter($allowed)));
         // Always include 'page' as it's enabled by default (not shown in config)
-        if (!in_array('page', $allowed, true)) {
+        if (! in_array('page', $allowed, true)) {
             $allowed[] = 'page';
         }
-        return !empty($allowed) ? $allowed : array('post', 'page');
+        return ! empty($allowed) ? $allowed : ['post', 'page'];
     }
 
     public function aimt_clear_alert_flag()
@@ -340,7 +457,7 @@ class AIMT_Admin
     {
         check_ajax_referer('aimt_configration_nonce', 'nonce');
 
-        if (!current_user_can('manage_options')) {
+        if (! current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
         }
 
@@ -353,10 +470,10 @@ class AIMT_Admin
 
             $this->save_individual_options($sanitized_state);
 
-            wp_send_json_success(array(
+            wp_send_json_success([
                 'message' => 'State saved successfully',
-                'state' => $sanitized_state
-            ));
+                'state'   => $sanitized_state,
+            ]);
         } else {
             wp_send_json_error('Invalid state data');
         }
@@ -366,23 +483,23 @@ class AIMT_Admin
     {
         check_ajax_referer('aimt_configration_nonce', 'nonce');
 
-        if (!current_user_can('manage_options')) {
+        if (! current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
         }
 
-        $state = get_option('aimt_configration_state', array());
+        $state = get_option('aimt_configration_state', []);
 
-        wp_send_json_success(array(
-            'state' => $state,
-            'exists' => !empty($state)
-        ));
+        wp_send_json_success([
+            'state'  => $state,
+            'exists' => ! empty($state),
+        ]);
     }
 
     public function clear_onboarding_state()
     {
         check_ajax_referer('aimt_configration_nonce', 'nonce');
 
-        if (!current_user_can('manage_options')) {
+        if (! current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
         }
 
@@ -395,11 +512,11 @@ class AIMT_Admin
 
     private function sanitize_onboarding_state($state)
     {
-        $sanitized = array();
+        $sanitized = [];
 
         $sanitized['step'] = sanitize_text_field($state['step'] ?? 'languages');
 
-        $sanitized['selectedLanguages'] = array();
+        $sanitized['selectedLanguages'] = [];
         if (isset($state['selectedLanguages']) && is_array($state['selectedLanguages'])) {
             foreach ($state['selectedLanguages'] as $code => $name) {
                 $clean_code = sanitize_text_field($code);
@@ -410,7 +527,7 @@ class AIMT_Admin
             }
         }
 
-        $sanitized['translationLanguages'] = array();
+        $sanitized['translationLanguages'] = [];
         if (isset($state['translationLanguages']) && is_array($state['translationLanguages'])) {
             foreach ($state['translationLanguages'] as $code => $name) {
                 $clean_code = sanitize_text_field($code);
@@ -421,22 +538,26 @@ class AIMT_Admin
             }
         }
 
-        $sanitized['postTypes'] = array();
+        $sanitized['postTypes'] = [];
         if (isset($state['postTypes']) && is_array($state['postTypes'])) {
             foreach ($state['postTypes'] as $pt) {
                 $clean = sanitize_text_field($pt);
-                if ($clean)
+                if ($clean) {
                     $sanitized['postTypes'][] = $clean;
+                }
+
             }
         } else {
-            if (!empty($state['postType'])) {
+            if (! empty($state['postType'])) {
                 $clean = sanitize_text_field($state['postType']);
-                if ($clean)
+                if ($clean) {
                     $sanitized['postTypes'][] = $clean;
+                }
+
             }
         }
 
-        $sanitized['wpmlKey'] = sanitize_text_field($state['wpmlKey'] ?? '');
+        $sanitized['wpmlKey']         = sanitize_text_field($state['wpmlKey'] ?? '');
         $sanitized['translationMode'] = sanitize_text_field($state['translationMode'] ?? '');
 
         return $sanitized;
@@ -444,21 +565,21 @@ class AIMT_Admin
 
     private function save_individual_options($state)
     {
-        if (!empty($state['selectedLanguages'])) {
+        if (! empty($state['selectedLanguages'])) {
             update_option('aimt_default_languages', array_keys($state['selectedLanguages']));
         }
 
-        if (!empty($state['translationLanguages'])) {
+        if (! empty($state['translationLanguages'])) {
             update_option('aimt_translation_languages', array_keys($state['translationLanguages']));
         }
 
-        if (!empty($state['postTypes'])) {
+        if (! empty($state['postTypes'])) {
             update_option('aimt_selected_post_types', array_values($state['postTypes']));
         }
 
         update_option('aimt_translation_mode', $state['translationMode']);
 
-        if (!empty($state['wpmlKey'])) {
+        if (! empty($state['wpmlKey'])) {
             update_option('aimt_api_key', sanitize_text_field($state['wpmlKey']));
         }
     }
@@ -476,19 +597,19 @@ class AIMT_Admin
 
     public function get_onboarding_config()
     {
-        $state = get_option('aimt_configration_state', array());
+        $state = get_option('aimt_configration_state', []);
 
         if (empty($state)) {
-            $state = array(
-                'selectedLanguages' => array_flip(get_option('aimt_default_languages', array('en'))),
-                'translationLanguages' => array_flip(get_option('aimt_translation_languages', array())),
-                'postTypes' => array_flip(get_option('aimt_selected_post_types', array())),
+            $state = [
+                'selectedLanguages'    => array_flip(get_option('aimt_default_languages', ['en'])),
+                'translationLanguages' => array_flip(get_option('aimt_translation_languages', [])),
+                'postTypes'            => array_flip(get_option('aimt_selected_post_types', [])),
                 // 'urlFormat' => get_option('aimt_url_format', 'subdirectory'),
-                'translationMode' => get_option('aimt_translation_mode', ''),
-                'wpmlKey' => get_option('aimt_wpml_key', ''),
-                'support' => get_option('aimt_support_options', array())
+                'translationMode'      => get_option('aimt_translation_mode', ''),
+                'wpmlKey'              => get_option('aimt_wpml_key', ''),
+                'support'              => get_option('aimt_support_options', []),
                 // removed 'plugins' option retrieval
-            );
+            ];
         }
 
         return $state;
@@ -497,10 +618,10 @@ class AIMT_Admin
     public function is_onboarding_complete()
     {
         $state = $this->get_onboarding_config();
-        return !empty($state['selectedLanguages']) &&
-            !empty($state['translationLanguages']) &&
-            !empty($state['postTypes']) &&
-            !empty($state['translationMode']);
+        return ! empty($state['selectedLanguages']) &&
+        ! empty($state['translationLanguages']) &&
+        ! empty($state['postTypes']) &&
+        ! empty($state['translationMode']);
     }
 
     public function register_menu()
@@ -527,7 +648,7 @@ class AIMT_Admin
             'AI Multi-Lang Config',
             'manage_options',
             'aimt-configrations',
-            array($this, 'configration_page'),
+            [$this, 'configration_page'],
             'dashicons-admin-generic',
             80
         );
@@ -537,14 +658,14 @@ class AIMT_Admin
             'String Translations',
             'manage_options',
             'aimt-settings',
-            array($this, 'settings_page')
+            [$this, 'settings_page']
         );
     }
 
     public function assets($hook)
     {
         $is_onboarding = (strpos($hook, 'aimt-configrations') !== false);
-        $is_settings = (strpos($hook, 'aimt-settings') !== false);
+        $is_settings   = (strpos($hook, 'aimt-settings') !== false);
 
         if ($is_onboarding) {
             wp_enqueue_style(
@@ -555,7 +676,7 @@ class AIMT_Admin
             wp_enqueue_script(
                 'aimt-bootstrap',
                 'https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js',
-                array('jquery'),
+                ['jquery'],
                 null,
                 true
             );
@@ -563,7 +684,7 @@ class AIMT_Admin
             wp_enqueue_script(
                 'aimt-configrations-js',
                 plugin_dir_url(__FILE__) . '../assets/js/configrations.js',
-                array('jquery', 'aimt-bootstrap'),
+                ['jquery', 'aimt-bootstrap'],
                 '1.0',
                 true
             );
@@ -573,7 +694,7 @@ class AIMT_Admin
             wp_enqueue_style(
                 'aimt-configrations-css',
                 plugin_dir_url(__FILE__) . '../assets/css/onboarding.css',
-                array(),
+                [],
                 '1.0'
             );
         }
@@ -581,7 +702,7 @@ class AIMT_Admin
         if ($is_onboarding) {
             wp_localize_script('aimt-configrations-js', 'aimtOnboardingData', [
                 'ajaxurl' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('aimt_configration_nonce'),
+                'nonce'   => wp_create_nonce('aimt_configration_nonce'),
             ]);
         }
 
@@ -596,8 +717,8 @@ class AIMT_Admin
 
             global $post;
             if ($post) {
-                $available_target_codes = (array) get_option('aimt_translation_languages', array());
-                $common_languages = array(
+                $available_target_codes = (array) get_option('aimt_translation_languages', []);
+                $common_languages       = [
                     'en' => 'English',
                     'es' => 'Spanish',
                     'fr' => 'French',
@@ -607,24 +728,35 @@ class AIMT_Admin
                     'zh' => 'Chinese',
                     'ja' => 'Japanese',
                     'ru' => 'Russian',
-                    'ar' => 'Arabic'
-                );
+                    'ar' => 'Arabic',
+                ];
 
-                $translation_langs = array();
+                $translation_langs = [];
                 foreach ($available_target_codes as $code) {
                     $code = sanitize_text_field($code);
-                    if (empty($code))
+                    if (empty($code)) {
                         continue;
+                    }
+
                     $translation_langs[$code] = isset($common_languages[$code]) ? $common_languages[$code] : strtoupper($code);
                 }
-
+                $elementor_nodes        = get_post_meta($post->ID, '_aimt_elementor_debug', true);
+                $raw_elementor_data     = get_post_meta($post->ID, '_elementor_data', true);
+                $decoded_elementor_data = [];
+                if (! empty($raw_elementor_data)) {
+                    $decoded                = json_decode($raw_elementor_data, true);
+                    $decoded_elementor_data = is_array($decoded) ? $decoded : [];
+                }
                 wp_localize_script('aimt-post-alert', 'aimtData', [
-                    'show_alert' => get_post_meta($post->ID, '_aimt_show_alert', true),
-                    'post_id' => $post->ID,
-                    'ajax_url' => admin_url('admin-ajax.php'),
-                    'nonce' => wp_create_nonce('aimt_alert_nonce'),
-                    'translation_languages' => $translation_langs,
-                    'config_page_url' => admin_url('admin.php?page=aimt-configrations')
+                    'show_alert'             => get_post_meta($post->ID, '_aimt_show_alert', true),
+                    'post_id'                => $post->ID,
+                    'raw_elementor_data'     => $raw_elementor_data,
+                    'decoded_elementor_data' => $decoded_elementor_data,
+                    'ajax_url'               => admin_url('admin-ajax.php'),
+                    'nonce'                  => wp_create_nonce('aimt_alert_nonce'),
+                    'translation_languages'  => $translation_langs,
+                    'config_page_url'        => admin_url('admin.php?page=aimt-configrations'),
+                    'elementor_nodes'        => $elementor_nodes,
                 ]);
             }
         }
@@ -639,7 +771,7 @@ class AIMT_Admin
             wp_verify_nonce($_POST['aimt_configration_nonce'], 'aimt_onboarding_save') &&
             current_user_can('manage_options')
         ) {
-            $raw = wp_unslash($_POST['aimt_configration_state']);
+            $raw     = wp_unslash($_POST['aimt_configration_state']);
             $decoded = json_decode($raw, true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 $sanitized = $this->sanitize_onboarding_state($decoded);
@@ -668,9 +800,9 @@ class AIMT_Admin
 
         $translatable_post_types = get_option(
             'aimt_translatable_post_types',
-            array('post', 'page')
+            ['post', 'page']
         );
-        $all_post_types = get_post_types(array(), 'objects');
+        $all_post_types = get_post_types([], 'objects');
         // echo '<pre>';
         // var_dump($selected_post_types);
         // echo '</pre>';
@@ -678,25 +810,33 @@ class AIMT_Admin
         // echo '<pre>';
         // var_dump($selected_post_types, $translatable_post_types);
         // echo '</pre>';
-        $blacklist = array('elementor_library', 'e-floating-buttons', 'page');
+        $blacklist = ['elementor_library', 'e-floating-buttons', 'page'];
         foreach ($all_post_types as $pt) {
-            if ($pt->name === 'attachment')
+            if ($pt->name === 'attachment') {
                 continue;
-            if (empty($pt->public) || empty($pt->publicly_queryable))
+            }
+
+            if (empty($pt->public) || empty($pt->publicly_queryable)) {
                 continue;
-            if (isset($pt->show_ui) && !$pt->show_ui)
+            }
+
+            if (isset($pt->show_ui) && ! $pt->show_ui) {
                 continue;
-            if (in_array($pt->name, $blacklist, true))
+            }
+
+            if (in_array($pt->name, $blacklist, true)) {
                 continue;
+            }
+
             $post_types[] = $pt;
         }
 
-        $steps = array(
-            'languages' => 'Languages',
+        $steps = [
+            'languages'          => 'Languages',
             'register-multilang' => 'Register AI multi language translation',
-            'translation-mode' => 'Translation Mode',
-            'finished' => 'Finished'
-        );
+            'translation-mode'   => 'Translation Mode',
+            'finished'           => 'Finished',
+        ];
 
         $template_path = plugin_dir_path(__FILE__) . '../templates/html/onboarding-page.php';
         if (file_exists($template_path)) {
@@ -971,7 +1111,7 @@ class AIMT_Admin
         global $wpdb;
         $table_name = $wpdb->prefix . 'aimt_string_translations';
 
-        $common_languages = array(
+        $common_languages = [
             'en' => 'English',
             'es' => 'Spanish',
             'fr' => 'French',
@@ -982,18 +1122,18 @@ class AIMT_Admin
             'ja' => 'Japanese',
             'ru' => 'Russian',
             // 'ar' => 'Arabic'
-        );
+        ];
 
-        $available_source_codes = (array) get_option('aimt_default_languages', array());
-        $available_target_codes = (array) get_option('aimt_translation_languages', array());
+        $available_source_codes = (array) get_option('aimt_default_languages', []);
+        $available_target_codes = (array) get_option('aimt_translation_languages', []);
 
-        if (!empty($available_source_codes)) {
+        if (! empty($available_source_codes)) {
             $source_options = array_intersect_key($common_languages, array_flip($available_source_codes));
         } else {
             $source_options = $common_languages;
         }
 
-        if (!empty($available_target_codes)) {
+        if (! empty($available_target_codes)) {
             $target_options = array_intersect_key($common_languages, array_flip($available_target_codes));
         } else {
             $target_options = $common_languages;
@@ -1001,12 +1141,12 @@ class AIMT_Admin
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && current_user_can('manage_options')) {
             if (isset($_POST['action']) && $_POST['action'] === 'aimt_add_translation') {
-                if (!wp_verify_nonce($_POST['aimt_add_translation_nonce'] ?? '', 'aimt_add_translation')) {
+                if (! wp_verify_nonce($_POST['aimt_add_translation_nonce'] ?? '', 'aimt_add_translation')) {
                     echo '<div class="notice notice-error"><p>Security check failed.</p></div>';
                 } else {
-                    $string = sanitize_textarea_field(wp_unslash($_POST['string'] ?? ''));
-                    $lang = sanitize_text_field($_POST['lang'] ?? '');
-                    $translated_lang = sanitize_text_field($_POST['translated_lang'] ?? '');
+                    $string            = sanitize_textarea_field(wp_unslash($_POST['string'] ?? ''));
+                    $lang              = sanitize_text_field($_POST['lang'] ?? '');
+                    $translated_lang   = sanitize_text_field($_POST['translated_lang'] ?? '');
                     $translated_string = sanitize_textarea_field(wp_unslash($_POST['translated_string'] ?? ''));
 
                     if (empty($string) || empty($lang) || empty($translated_lang) || empty($translated_string)) {
@@ -1014,15 +1154,15 @@ class AIMT_Admin
                     } else {
                         $wpdb->insert(
                             $table_name,
-                            array(
-                                'string' => $string,
-                                'lang' => $lang,
-                                'translated_lang' => $translated_lang,
+                            [
+                                'string'            => $string,
+                                'lang'              => $lang,
+                                'translated_lang'   => $translated_lang,
                                 'translated_string' => $translated_string,
-                                'created_at' => current_time('mysql'),
-                                'updated_at' => current_time('mysql')
-                            ),
-                            array('%s', '%s', '%s', '%s', '%s', '%s')
+                                'created_at'        => current_time('mysql'),
+                                'updated_at'        => current_time('mysql'),
+                            ],
+                            ['%s', '%s', '%s', '%s', '%s', '%s']
                         );
 
                         echo '<div class="notice notice-success"><p>Translation added.</p></div>';
@@ -1031,14 +1171,14 @@ class AIMT_Admin
             }
 
             if (isset($_POST['action']) && $_POST['action'] === 'aimt_edit_translation') {
-                if (!wp_verify_nonce($_POST['aimt_edit_translation_nonce'] ?? '', 'aimt_edit_translation')) {
+                if (! wp_verify_nonce($_POST['aimt_edit_translation_nonce'] ?? '', 'aimt_edit_translation')) {
                     echo '<div class="notice notice-error"><p>Security check failed.</p></div>';
                 } else {
                     $id = intval($_POST['id'] ?? 0);
                     if ($id > 0) {
-                        $string = sanitize_textarea_field(wp_unslash($_POST['string'] ?? ''));
-                        $lang = sanitize_text_field($_POST['lang'] ?? '');
-                        $translated_lang = sanitize_text_field($_POST['translated_lang'] ?? '');
+                        $string            = sanitize_textarea_field(wp_unslash($_POST['string'] ?? ''));
+                        $lang              = sanitize_text_field($_POST['lang'] ?? '');
+                        $translated_lang   = sanitize_text_field($_POST['translated_lang'] ?? '');
                         $translated_string = sanitize_textarea_field(wp_unslash($_POST['translated_string'] ?? ''));
 
                         if (empty($string) || empty($lang) || empty($translated_lang) || empty($translated_string)) {
@@ -1046,16 +1186,16 @@ class AIMT_Admin
                         } else {
                             $wpdb->update(
                                 $table_name,
-                                array(
-                                    'string' => $string,
-                                    'lang' => $lang,
-                                    'translated_lang' => $translated_lang,
+                                [
+                                    'string'            => $string,
+                                    'lang'              => $lang,
+                                    'translated_lang'   => $translated_lang,
                                     'translated_string' => $translated_string,
-                                    'updated_at' => current_time('mysql')
-                                ),
-                                array('id' => $id),
-                                array('%s', '%s', '%s', '%s', '%s'),
-                                array('%d')
+                                    'updated_at'        => current_time('mysql'),
+                                ],
+                                ['id' => $id],
+                                ['%s', '%s', '%s', '%s', '%s'],
+                                ['%d']
                             );
 
                             echo '<div class="notice notice-success"><p>Translation updated.</p></div>';
@@ -1065,12 +1205,12 @@ class AIMT_Admin
             }
 
             if (isset($_POST['action']) && $_POST['action'] === 'aimt_delete_translation') {
-                if (!wp_verify_nonce($_POST['aimt_delete_translation_nonce'] ?? '', 'aimt_delete_translation')) {
+                if (! wp_verify_nonce($_POST['aimt_delete_translation_nonce'] ?? '', 'aimt_delete_translation')) {
                     echo '<div class="notice notice-error"><p>Security check failed.</p></div>';
                 } else {
                     $id = intval($_POST['id'] ?? 0);
                     if ($id > 0) {
-                        $wpdb->delete($table_name, array('id' => $id), array('%d'));
+                        $wpdb->delete($table_name, ['id' => $id], ['%d']);
                         echo '<div class="notice notice-success"><p>Translation deleted.</p></div>';
                     }
                 }

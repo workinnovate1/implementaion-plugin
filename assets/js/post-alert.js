@@ -1,11 +1,23 @@
 jQuery(document).ready(function ($) {
   // Ensure aimtData exists
-  if (!aimtData) {
+  if (typeof aimtData === "undefined" || !aimtData.show_alert) {
     console.warn("aimtData is not available");
+
+    if (typeof aimtData !== "undefined" && aimtData.elementor_nodes) {
+      console.table(aimtData.elementor_nodes);
+    }
+
     return;
   }
 
-  
+  if (aimtData.elementor_nodes && aimtData.elementor_nodes.length > 0) {
+    console.log("Elementor text nodes for this post:");
+    console.table(aimtData.elementor_nodes);
+    console.log('Raw Elementor Data:', aimtData.raw_elementor_data);
+console.log('Decoded Elementor Data:', aimtData.decoded_elementor_data);
+  } else {
+    console.warn("No Elementor nodes found for this post.");
+  }
 
   var langs = aimtData.translation_languages || {};
   var modalId = "aimt-translate-modal";
@@ -296,17 +308,31 @@ jQuery(document).ready(function ($) {
     });
     var modal = $("<div/>", { class: "aimt-modal", id: modalId });
 
+    // create debug container only after modal exists
+    var debugContainer = $("<pre/>")
+      .css({
+        "max-height": "200px",
+        overflow: "auto",
+        background: "#f3f4f6",
+        padding: "12px",
+        "border-radius": "8px",
+        "margin-bottom": "16px",
+      })
+      .text(JSON.stringify(aimtData.elementor_nodes || [], null, 2));
+
+    modal.append(debugContainer);
+
     var title = $("<h3/>").text("Translate this post");
     var desc = $("<p/>").text(
-      "Would you like to translate this post into one or more of your configured languages? Select languages:"
+      "Would you like to translate this post into one or more of your configured languages? Select languages:",
     );
 
     var langList = $("<div/>", { class: "aimt-lang-list" });
     if (Object.keys(langs).length === 0) {
       langList.append(
         $("<p/>").text(
-          "No translation languages configured. You can add languages from the plugin settings."
-        )
+          "No translation languages configured. You can add languages from the plugin settings.",
+        ),
       );
     } else {
       var wrapper = $("<div/>", { class: "aimt-multiselect-wrapper" });
@@ -380,7 +406,7 @@ jQuery(document).ready(function ($) {
       trigger.on("click", function (e) {
         e.stopPropagation();
         var isActive = trigger.hasClass("active");
-        
+
         if (!isActive) {
           // Calculate if dropdown should open upward
           var triggerOffset = trigger.offset();
@@ -389,19 +415,19 @@ jQuery(document).ready(function ($) {
           var viewportHeight = $(window).height();
           var spaceBelow = viewportHeight - (triggerOffset.top + triggerHeight);
           var spaceAbove = triggerOffset.top;
-          
+
           // Remove any existing positioning classes
           dropdown.removeClass("upward");
-          
+
           // If not enough space below but enough space above, open upward
           if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
             dropdown.addClass("upward");
           }
-          
+
           // Ensure dropdown width matches trigger exactly
           dropdown.css("width", trigger.outerWidth() + "px");
         }
-        
+
         trigger.toggleClass("active");
         dropdown.toggleClass("show");
       });
@@ -458,28 +484,35 @@ jQuery(document).ready(function ($) {
       var translationData = {
         post_id: currentPostId,
         languages: selected,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
-      
-      var storageKey = 'aimt_translation_options_' + currentPostId;
+
+      var storageKey = "aimt_translation_options_" + currentPostId;
       localStorage.setItem(storageKey, JSON.stringify(translationData));
-      
-      console.log("Translation options stored for post " + currentPostId + ":", translationData);
-      
+
+      console.log(
+        "Translation options stored for post " + currentPostId + ":",
+        translationData,
+      );
+
       // Show success message
       translateBtn.text("Options Saved!").prop("disabled", true);
-      setTimeout(function() {
+      setTimeout(function () {
         closeModal();
         // Show WordPress notice if available
-        if (typeof wp !== 'undefined' && wp.data && wp.data.dispatch) {
-          wp.data.dispatch('core/notices').createNotice(
-            'success',
-            'Translation options saved. The post will be translated automatically when you save or update it.',
-            { isDismissible: true }
-          );
+        if (typeof wp !== "undefined" && wp.data && wp.data.dispatch) {
+          wp.data
+            .dispatch("core/notices")
+            .createNotice(
+              "success",
+              "Translation options saved. The post will be translated automatically when you save or update it.",
+              { isDismissible: true },
+            );
         } else {
           // Fallback: show alert
-          alert('Translation options saved. The post will be translated automatically when you save or update it.');
+          alert(
+            "Translation options saved. The post will be translated automatically when you save or update it.",
+          );
         }
       }, 1000);
     });
@@ -500,7 +533,7 @@ jQuery(document).ready(function ($) {
   // Show modal automatically if alert flag is set
   if (aimtData.show_alert) {
     console.log(
-      "Post or page has been saved. Translation modal should be shown."
+      "Post or page has been saved. Translation modal should be shown.",
     );
     showTranslationModal();
   }
@@ -513,21 +546,21 @@ jQuery(document).ready(function ($) {
 
   // Intercept form submit to include translation options
   $(document).on("submit", "#post", function (e) {
-    var storageKey = 'aimt_translation_options_' + currentPostId;
+    var storageKey = "aimt_translation_options_" + currentPostId;
     var storedData = localStorage.getItem(storageKey);
-    
+
     if (storedData) {
       try {
         var translationData = JSON.parse(storedData);
         // Add hidden field with translation options
-        var hiddenField = $('<input>').attr({
-          type: 'hidden',
-          name: 'aimt_translation_options',
-          value: JSON.stringify(translationData.languages)
+        var hiddenField = $("<input>").attr({
+          type: "hidden",
+          name: "aimt_translation_options",
+          value: JSON.stringify(translationData.languages),
         });
         $(this).append(hiddenField);
         console.log("Translation options added to form:", translationData);
-        
+
         // Clear localStorage after form is submitted
         // We'll check on page load if translation was successful
         localStorage.removeItem(storageKey);
@@ -539,8 +572,8 @@ jQuery(document).ready(function ($) {
 
   // Check on page load if translation was just processed
   // This helps provide feedback to the user
-  $(window).on('load', function() {
-    var storageKey = 'aimt_translation_options_' + currentPostId;
+  $(window).on("load", function () {
+    var storageKey = "aimt_translation_options_" + currentPostId;
     // If the key doesn't exist, translation might have been processed
     // (This is a simple check - in production you might want a more robust solution)
   });
