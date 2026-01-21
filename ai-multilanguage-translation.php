@@ -43,7 +43,7 @@ if (class_exists('MultilanguagePlugin')) {
 // these post types are only for testing purpose
 function register_test_post_types()
 {
-    // Books
+  
     register_post_type('books', array(
         'label'        => 'Books',
         'public'       => true,
